@@ -15,7 +15,7 @@ llm
 **One command** (replace `YOUR_USERNAME` with the repo owner if you forked):
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/localai/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/magido87/shard/master/install.sh)
 ```
 
 Then open a new terminal tab and run `llm`. First time you get a short wizard (model + personality); after that you just type `llm` and chat.
@@ -23,15 +23,15 @@ Then open a new terminal tab and run `llm`. First time you get a short wizard (m
 **Alternativt — git:**
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/localai.git
-cd localai
+git clone https://github.com/magido87/shard.git
+cd shard
 bash setup.sh
 ```
 
 **Alternativt — Homebrew** (when tap is available):
 
 ```bash
-brew tap YOUR_USERNAME/localai && brew install localai
+brew tap magido87/shard && brew install shard
 ```
 
 Setup detects your Mac (M1–M5, any RAM), suggests a model that fits, and installs the `llm` command in `~/bin/`. Restart the terminal or run `source ~/.zshrc` if `llm` is not found.

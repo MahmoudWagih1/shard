@@ -3,7 +3,7 @@
 # Usage: bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/localai/main/install.sh)
 set -euo pipefail
 
-REPO_URL="${LOCALAI_REPO_URL:-https://github.com/YOUR_USERNAME/localai.git}"
+REPO_URL="${LOCALAI_REPO_URL:-https://github.com/magido87/shard.git}"
 LOCALAI_DIR="${HOME}/.localai"
 BRANCH="${LOCALAI_BRANCH:-main}"
 
