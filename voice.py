@@ -1,21 +1,15 @@
 """
-Optional voice mode for LocalAI — push-to-talk via mlx-whisper + sounddevice.
+Optional voice mode for LocalAI — toggle push-to-talk via mlx-whisper + sounddevice.
 
-Install voice dependencies:
+Install:
     pip install mlx-whisper sounddevice
 
-Activate:
-    llm --voice
+Usage in chat:
+    v  → start recording  (indicator shows, timer runs)
+    v  → stop  + transcribe + send
+    q  → cancel recording
 
-Architecture:
-    push_to_talk() → records audio → transcribes with mlx-whisper → returns text
-    The returned text is injected into the chat loop as the user's message.
-
-STT backend: mlx-whisper (Whisper via MLX, Apple Silicon optimized, 100% offline)
-Default model: whisper-tiny (≈150 MB) — change WHISPER_MODEL for better quality.
-    tiny   ≈150 MB  fast, decent quality
-    base   ≈290 MB  balanced (recommended)
-    small  ≈970 MB  high quality, slower
+Backend: mlx-whisper (Whisper via MLX, Apple Silicon, 100% offline)
 """
 
 VOICE_AVAILABLE = False
@@ -28,69 +22,113 @@ try:
 except ImportError:
     pass
 
-WHISPER_MODEL  = "mlx-community/whisper-base-mlx"  # change for better quality
-SAMPLE_RATE    = 16000   # Whisper requires 16 kHz
-RECORD_SECONDS = 8       # max recording length per push
+import threading
+
+WHISPER_MODEL = "mlx-community/whisper-base-mlx"
+SAMPLE_RATE   = 16000
+
+# ── Internal state ────────────────────────────────────────────────
+_stream    = None
+_frames    = []
+_recording = False
+_lock      = threading.Lock()
 
 
 def check_available() -> bool:
-    """Return True if voice deps are installed."""
     return VOICE_AVAILABLE
 
 
-def push_to_talk(prompt_fn=None) -> str:
-    """
-    Record audio and return transcribed text.
+def is_recording() -> bool:
+    return _recording
 
-    Args:
-        prompt_fn: optional callable(msg) to display status messages in terminal
 
-    Returns:
-        Transcribed string, or "" if recording failed or nothing was said.
-    """
+def start() -> bool:
+    """Start background recording. Returns True if started OK."""
+    global _stream, _frames, _recording
     if not VOICE_AVAILABLE:
-        return ""
-
-    def _msg(s: str):
-        if prompt_fn:
-            prompt_fn(s)
-
-    _msg("  🎙  Recording … (press Enter to stop)")
-
-    frames = []
-
-    def _callback(indata, frame_count, time_info, status):
-        frames.append(indata.copy())
-
+        return False
+    with _lock:
+        _frames = []
+        _recording = True
     try:
-        with sd.InputStream(
+        _stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
             channels=1,
             dtype="float32",
-            callback=_callback,
-        ):
-            input()  # wait for Enter key
-
-    except Exception as e:
-        _msg(f"  ⚠  Recording error: {e}")
-        return ""
-
-    if not frames:
-        return ""
-
-    audio = np.concatenate(frames, axis=0).flatten()
-
-    _msg("  ◈  Transcribing …")
-    try:
-        result = mlx_whisper.transcribe(
-            audio,
-            path_or_hf_repo=WHISPER_MODEL,
+            callback=_cb,
         )
-        text = result.get("text", "").strip()
-        return text
-    except Exception as e:
-        _msg(f"  ⚠  Transcription error: {e}")
+        _stream.start()
+        return True
+    except Exception:
+        _recording = False
+        return False
+
+
+def stop() -> str:
+    """Stop recording and return transcribed text (blocking)."""
+    global _stream, _recording
+    with _lock:
+        _recording = False
+    if _stream:
+        try:
+            _stream.stop()
+            _stream.close()
+        except Exception:
+            pass
+        _stream = None
+
+    with _lock:
+        frames = list(_frames)
+
+    if not frames or not VOICE_AVAILABLE:
         return ""
+    try:
+        audio = np.concatenate(frames).flatten()
+        result = mlx_whisper.transcribe(audio, path_or_hf_repo=WHISPER_MODEL)
+        return result.get("text", "").strip()
+    except Exception:
+        return ""
+
+
+def cancel() -> None:
+    """Stop recording, discard audio."""
+    global _stream, _recording, _frames
+    with _lock:
+        _recording = False
+        _frames = []
+    if _stream:
+        try:
+            _stream.stop()
+            _stream.close()
+        except Exception:
+            pass
+        _stream = None
+
+
+def _cb(indata, frame_count, time_info, status):
+    """sounddevice callback — runs in audio thread."""
+    with _lock:
+        if _recording:
+            _frames.append(indata.copy())
+
+
+def push_to_talk(prompt_fn=None) -> str:
+    """Blocking push-to-talk: records until user presses Enter, then transcribes."""
+    if not VOICE_AVAILABLE:
+        return ""
+    if prompt_fn:
+        prompt_fn("  \033[1m\033[38;5;196m●\033[0m REC  press Enter to stop …")
+    if not start():
+        if prompt_fn:
+            prompt_fn("  \033[33m⚠  Failed to start microphone\033[0m")
+        return ""
+    try:
+        input()
+    except (EOFError, KeyboardInterrupt):
+        cancel()
+        return ""
+    text = stop()
+    return text
 
 
 def install_instructions() -> str:
@@ -98,6 +136,6 @@ def install_instructions() -> str:
         "Voice mode requires additional packages.\n"
         "Install with:\n\n"
         "    pip install mlx-whisper sounddevice\n\n"
-        "Or run setup.sh with the --voice flag:\n\n"
+        "Or re-run setup:\n\n"
         "    bash setup.sh --voice"
     )

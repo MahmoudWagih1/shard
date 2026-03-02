@@ -54,3 +54,8 @@ cd ~/.localai && bash setup.sh
 - Python 3 + venv
 - `mlx-lm`, `psutil`
 - Apple Silicon (MLX kräver Metal GPU)
+
+## Hastighet
+- **Snabbare startup:** `mlx_lm` importeras lazy (efter model pick) så pickern visas direkt.
+- **Snabbare första svar:** Efter modelload körs en kort Metal-warmup (1–2 tokens) så första riktiga meddelandet inte är "kallt".
+- **Mer t/s:** Använd mindre modell (t.ex. dolphin), stäng andra appar för mer minne/bandbredd; lägre `kv`/`tokens` i MODELS ger mindre minne och kan ge lite bättre throughput.

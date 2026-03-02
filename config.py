@@ -6,10 +6,15 @@ from pathlib import Path
 CONFIG_PATH = Path.home() / ".localai" / "config.json"
 
 DEFAULTS: dict = {
-    "model":       "dolphin",
-    "theme":       "neon",
-    "personality": 1,
-    "temp":        0.72,
+    "model":        "dolphin",
+    "theme":        "neon",
+    "personality":  1,
+    "temp":         0.72,
+    "first_run":    True,
+    "stats":        "compact",
+    "log_sessions": False,
+    "privacy_mode": False,
+    "ui_mode":      "normal",
 }
 
 
@@ -19,7 +24,9 @@ def load() -> dict:
     try:
         if CONFIG_PATH.exists():
             data = json.loads(CONFIG_PATH.read_text())
-            cfg.update({k: v for k, v in data.items() if k in DEFAULTS})
+            for k, v in data.items():
+                if k in DEFAULTS:
+                    cfg[k] = v
     except Exception:
         pass
     return cfg

@@ -10,6 +10,34 @@ llm
 
 ---
 
+## Install
+
+**One command** (replace `YOUR_USERNAME` with the repo owner if you forked):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/localai/main/install.sh)
+```
+
+Then open a new terminal tab and run `llm`. First time you get a short wizard (model + personality); after that you just type `llm` and chat.
+
+**Alternativt — git:**
+
+```bash
+git clone https://github.com/YOUR_USERNAME/localai.git
+cd localai
+bash setup.sh
+```
+
+**Alternativt — Homebrew** (when tap is available):
+
+```bash
+brew tap YOUR_USERNAME/localai && brew install localai
+```
+
+Setup detects your Mac (M1–M5, any RAM), suggests a model that fits, and installs the `llm` command in `~/bin/`. Restart the terminal or run `source ~/.zshrc` if `llm` is not found.
+
+---
+
 ## Features
 
 - **100% offline** — no network calls after model download
@@ -27,31 +55,9 @@ llm
 ## Requirements
 
 - **macOS 13 Ventura** or later
-- **Apple Silicon** (M1, M2, M3, M4 — any variant)
+- **Apple Silicon** (M1, M2, M3, M4, M5 — any variant)
 - **Python 3.10+**
 - **8 GB unified memory** minimum (16 GB+ recommended)
-
----
-
-## Install
-
-```bash
-git clone https://github.com/YOUR_USERNAME/localai.git
-cd localai
-bash setup.sh
-```
-
-Setup will:
-1. Detect your chip, RAM and available disk space
-2. Show which models are compatible with your machine
-3. Let you pick which models to download (only what fits)
-4. Install a `llm` command in `~/bin/`
-
-After setup, restart your terminal or run `source ~/.zshrc`, then:
-
-```bash
-llm
-```
 
 ---
 
@@ -158,15 +164,18 @@ bash wipe_session.sh
 
 ```
 localai/
+├── install.sh       One-command install (curl) — clone/update + setup.sh
+├── setup.sh         Install — venv, deps, hardware check, model download, voice opt-in
 ├── chat.py          Main app — model picker, chat loop, UI, themes, personalities
 ├── config.py        Persistent config (~/.localai/config.json)
 ├── voice.py         Optional voice mode (mlx-whisper, import-guarded)
 ├── detect.py        Hardware detection — chip, RAM, disk, swap risk (stdlib only)
 ├── agent.py         Logging stub (disabled for privacy)
-├── setup.sh         Install — venv, deps, hardware check, model download, voice opt-in
 ├── llm.sh           ~/bin/llm wrapper source
 ├── llm-stop.sh      ~/bin/llm-stop wrapper source
-└── wipe_session.sh  Safe session cleanup
+├── wipe_session.sh  Safe session cleanup
+└── docs/
+    └── BREW_TAP.md  Homebrew tap formula sketch (optional)
 ```
 
 ---

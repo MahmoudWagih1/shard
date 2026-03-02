@@ -17,19 +17,15 @@ os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
+import argparse
+import re
+
 import mlx.core as mx
 import psutil
-from mlx_lm import load
-from mlx_lm.generate import stream_generate
-from mlx_lm.models.cache import make_prompt_cache
-from mlx_lm.sample_utils import make_sampler
 
 from agent import log_interaction
 from config import load as _cfg_load, save as _cfg_save
 from detect import detect as _hw_detect
-from voice import push_to_talk as _voice_push, check_available as _voice_ok, install_instructions as _voice_install_msg
-import argparse
-import re
 
 
 def _mv(row: int, col: int = 0) -> str:
@@ -52,9 +48,47 @@ def _mv(row: int, col: int = 0) -> str:
 # ── Model registry ───────────────────────────────────────────────
 # min_ram: minimum GB of unified memory needed
 # profile: "safe" = shown in standard mode; "unfiltered" = requires --unfiltered
+# dl_size: approximate download size string shown in picker
 # All IDs verified against HuggingFace (March 2026)
 MODELS = {
-    # ── Compact (8–10 GB) ─────────────────────────────────────────
+    # ── Tiny / fast (6–8 GB RAM) ──────────────────────────────────
+    "phi4mini": {
+        "id":      "mlx-community/Phi-4-mini-instruct-4bit",
+        "label":   "Phi-4 mini  ·  3.8B  ·  4bit",
+        "size":    "3.8B",
+        "prompt":  "phi",
+        "theme":   "ocean",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 6,
+        "dl_size": "~2.5 GB",
+        "profile": "safe",
+    },
+    "gemma4": {
+        "id":      "mlx-community/gemma-3-4b-it-4bit",
+        "label":   "Gemma 3  ·  4B  ·  4bit",
+        "size":    "4B",
+        "prompt":  "gemma",
+        "theme":   "ocean",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 6,
+        "dl_size": "~3 GB",
+        "profile": "safe",
+    },
+    "mistral7": {
+        "id":      "mlx-community/Mistral-7B-Instruct-v0.3-4bit",
+        "label":   "Mistral  ·  7B Instruct  ·  4bit",
+        "size":    "7B",
+        "prompt":  "mistral",
+        "theme":   "ocean",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 6,
+        "dl_size": "~4 GB",
+        "profile": "safe",
+    },
+    # ── Compact (8–10 GB RAM) ─────────────────────────────────────
     "dolphin": {
         "id":      "mlx-community/Dolphin3.0-Llama3.1-8B-4bit",
         "label":   "Dolphin 3.0  ·  Llama 3.1 8B  ·  4bit",
@@ -64,9 +98,58 @@ MODELS = {
         "kv":      2048,
         "tokens":  1024,
         "min_ram": 8,
+        "dl_size": "~5 GB",
         "profile": "safe",
     },
-    # ── Mid 14B ───────────────────────────────────────────────────
+    "llama8": {
+        "id":      "mlx-community/Llama-3.1-8B-Instruct-4bit",
+        "label":   "Llama 3.1  ·  8B Instruct  ·  4bit",
+        "size":    "8B",
+        "prompt":  "llama",
+        "theme":   "neon",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 8,
+        "dl_size": "~5 GB",
+        "profile": "safe",
+    },
+    "q8": {
+        "id":      "mlx-community/Qwen3-8B-4bit",
+        "label":   "Qwen 3  ·  8B  ·  4bit",
+        "size":    "8B",
+        "prompt":  "qwen",
+        "theme":   "ocean",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 8,
+        "dl_size": "~5 GB",
+        "profile": "safe",
+    },
+    # ── Mid (10–12 GB RAM) ────────────────────────────────────────
+    "gemma12": {
+        "id":      "mlx-community/gemma-3-12b-it-4bit",
+        "label":   "Gemma 3  ·  12B  ·  4bit",
+        "size":    "12B",
+        "prompt":  "gemma",
+        "theme":   "ocean",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 10,
+        "dl_size": "~7 GB",
+        "profile": "safe",
+    },
+    "phi4": {
+        "id":      "mlx-community/phi-4-3bit",
+        "label":   "Phi-4  ·  14B  ·  3bit",
+        "size":    "14B",
+        "prompt":  "phi",
+        "theme":   "ocean",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 10,
+        "dl_size": "~7 GB",
+        "profile": "safe",
+    },
     "q14": {
         "id":      "mlx-community/Qwen3-14B-4bit",
         "label":   "Qwen 3  ·  14B  ·  4bit",
@@ -76,9 +159,22 @@ MODELS = {
         "kv":      2048,
         "tokens":  1024,
         "min_ram": 10,
+        "dl_size": "~8 GB",
         "profile": "safe",
     },
-    # ── Large 32B ─────────────────────────────────────────────────
+    "qwen25": {
+        "id":      "mlx-community/Qwen2.5-14B-Instruct-4bit",
+        "label":   "Qwen 2.5  ·  14B Instruct  ·  4bit",
+        "size":    "14B",
+        "prompt":  "qwen",
+        "theme":   "ocean",
+        "kv":      1536,
+        "tokens":  768,
+        "min_ram": 12,
+        "dl_size": "~9 GB",
+        "profile": "safe",
+    },
+    # ── Large (14–20 GB RAM) ──────────────────────────────────────
     "q32_3": {
         "id":      "mlx-community/Qwen3-32B-3bit",
         "label":   "Qwen 3  ·  32B  ·  3bit",
@@ -88,6 +184,19 @@ MODELS = {
         "kv":      2048,
         "tokens":  1024,
         "min_ram": 14,
+        "dl_size": "~13 GB",
+        "profile": "safe",
+    },
+    "mistral24": {
+        "id":      "mlx-community/Mistral-Small-3.1-24B-Instruct-2503-4bit",
+        "label":   "Mistral Small  ·  24B  ·  4bit",
+        "size":    "24B",
+        "prompt":  "mistral",
+        "theme":   "ocean",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 16,
+        "dl_size": "~14 GB",
         "profile": "safe",
     },
     "q32": {
@@ -99,10 +208,35 @@ MODELS = {
         "kv":      2048,
         "tokens":  1024,
         "min_ram": 20,
+        "dl_size": "~18 GB",
+        "profile": "safe",
+    },
+    # ── Very large (40+ GB RAM) ───────────────────────────────────
+    "llama70": {
+        "id":      "mlx-community/Llama-3.3-70B-Instruct-4bit",
+        "label":   "Llama 3.3  ·  70B Instruct  ·  4bit",
+        "size":    "70B",
+        "prompt":  "llama",
+        "theme":   "neon",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 40,
+        "dl_size": "~38 GB",
         "profile": "safe",
     },
     # ── Unfiltered (abliterated, opt-in via --unfiltered) ─────────
-    # huihui models: original HF safetensors — mlx-lm quantizes on first load (~slow)
+    "gemma4_abl": {
+        "id":      "mlx-community/gemma-3-4b-it-abliterated-4bit-text",
+        "label":   "Gemma 3  ·  4B  ·  abliterated  ·  4bit",
+        "size":    "4B",
+        "prompt":  "gemma",
+        "theme":   "neon",
+        "kv":      2048,
+        "tokens":  1024,
+        "min_ram": 6,
+        "dl_size": "~3 GB",
+        "profile": "unfiltered",
+    },
     "hui27": {
         "id":      "huihui-ai/Huihui-Qwen3.5-27B-abliterated",
         "label":   "Huihui  ·  Qwen 3.5 27B  ·  abliterated",
@@ -112,6 +246,7 @@ MODELS = {
         "kv":      2048,
         "tokens":  1024,
         "min_ram": 16,
+        "dl_size": "~16 GB",
         "profile": "unfiltered",
     },
     "hui35": {
@@ -123,40 +258,24 @@ MODELS = {
         "kv":      2048,
         "tokens":  1024,
         "min_ram": 20,
+        "dl_size": "~20 GB",
         "profile": "unfiltered",
-    },
-    # ── Legacy / MoE ──────────────────────────────────────────────
-    "qwen": {
-        "id":      "mlx-community/Qwen2.5-14B-Instruct-4bit",
-        "label":   "Qwen 2.5  ·  14B Instruct  ·  4bit  (legacy)",
-        "size":    "14B",
-        "prompt":  "qwen",
-        "theme":   "ocean",
-        "kv":      1536,
-        "tokens":  768,
-        "min_ram": 12,
-        "profile": "safe",
-    },
-    "qwen35": {
-        "id":      "mlx-community/Qwen3.5-397B-A17B-4bit",
-        "label":   "Qwen 3.5  ·  397B MoE  ·  17B aktiv",
-        "size":    "MoE",
-        "prompt":  "qwen",
-        "theme":   "ocean",
-        "kv":      1024,
-        "tokens":  512,
-        "min_ram": 24,
-        "profile": "safe",
     },
 }
 
 TEMP = 0.72
 TOP_P = 0.92
 PID_FILE = os.path.expanduser("~/.localai/llm.pid")
+PICK_TIMEOUT = float(os.environ.get("LOCALAI_PICK_TIMEOUT", "2.0"))
+_VOICE_API = None
 
 # ── Mode ─────────────────────────────────────────────────────────
-UNFILTERED_MODE = False  # set to True via --unfiltered flag
+UNFILTERED_MODE = False
 HEADER_LINES = 2
+SHOW_STATS = "compact"     # "compact" | "full" | "off"
+PRIVACY_MODE = False
+LOG_SESSIONS = False
+UI_MODE = "normal"         # "normal" | "zen" | "focus"
 
 # ── Personality presets ──────────────────────────────────────────
 PERSONALITIES = {
@@ -444,21 +563,19 @@ def _render_header():
     cpu, gpu, ru, rt = _stats()
     pct = (ru / rt * 100) if rt else 0
     swap = psutil.swap_memory().used / (1024**3)
-    cols = shutil.get_terminal_size().columns
-    seg_cpu = f"{GR}CPU{RS} {_bar(cpu,6)} {CY}{cpu:3.0f}%{RS}"
-    seg_gpu = f"{GR}GPU{RS} {CY}{gpu:.1f}GB{RS}"
-    seg_ram = f"{GR}RAM{RS} {_bar(pct,6)} {CY}{ru:.1f}{GR}/{rt:.0f}GB{RS}"
-    seg_swp = f"  {DB}│{RS}  {GR}SWP{RS} {YL}{swap:.1f}GB{RS}" if swap > 0.1 else ""
-    div = f"  {DB}│{RS}  "
-    line = "  " + div.join([seg_cpu, seg_gpu, seg_ram]) + seg_swp
-    sep  = f"  {DB}{'─' * min(cols - 4, 72)}{RS}"
-    return line, sep
+    seg_cpu = f"{GR}CPU {CY}{cpu:.0f}%{RS}"
+    seg_gpu = f"{GR}GPU {CY}{gpu:.1f}GB{RS}"
+    seg_ram = f"{GR}RAM {CY}{ru:.1f}{GR}/{rt:.0f}GB{RS}"
+    seg_swp = f" {GR}SWP {YL}{swap:.1f}GB{RS}" if swap > 0.1 else ""
+    pvt = f" {GR}[pvt]{RS}" if PRIVACY_MODE else ""
+    line = f"  {seg_cpu} · {seg_gpu} · {seg_ram}{seg_swp}{pvt}"
+    return line
 
 
 def _print_header():
-    l1, l2 = _render_header()
-    print(l1)
-    print(l2)
+    if UI_MODE == "zen":
+        return
+    print(_render_header())
 
 
 def _update_header():
@@ -473,99 +590,75 @@ def _setup_scroll():
     pass   # no scroll regions — avoids iTerm2 cursor jump bugs
 
 
-# ── Banners ──────────────────────────────────────────────────────
-def _banner_dolphin():
-    try:    dev = mx.device_info().get("device_name", "M3").removeprefix("Apple ")
-    except: dev = "M3"
-    ram = psutil.virtual_memory().total / (1024 ** 3)
-    print(f"""
-{DB}  ╔{'═'*54}╗{RS}
-{DB}  ║{RS}{MG}  ≋ ≋ ≋  {BD}D O L P H I N   3 . 0{RS}{MG}  ≋ ≋ ≋          {DB}║{RS}
-{DB}  ╠{'═'*54}╣{RS}
-{DB}  ║{RS}                                                      {DB}║{RS}
-{DB}  ║{RS}  {DB}     ____{RS}      {BD}{CY}Llama 3.1 · 8B · 4-bit{RS}          {DB}║{RS}
-{DB}  ║{RS}  {MG}   /      \\{RS}     {GR}Apple {dev} · {ram:.0f} GB unified{RS}          {DB}║{RS}
-{DB}  ║{RS}  {MG}  |  {CY}◈{MG}     |{RS}     {GR}Temp {TEMP} · Top-p {TOP_P}{RS}               {DB}║{RS}
-{DB}  ║{RS}  {MG}   \\______/{RS}     {GR}offline · no cloud · MLX{RS}               {DB}║{RS}
-{DB}  ║{RS}  {MG}    \\___~_/{RS}                                       {DB}║{RS}
-{DB}  ║{RS}                                                      {DB}║{RS}
-{DB}  ╚{'═'*54}╝{RS}
-""")
-
-
-def _banner_qwen():
-    try:    dev = mx.device_info().get("device_name", "M3").removeprefix("Apple ")
-    except: dev = "M3"
-    ram = psutil.virtual_memory().total / (1024 ** 3)
-    print(f"""
-{DB}  ╔{'═'*54}╗{RS}
-{DB}  ║{RS}{CY}    ◆ ◆ ◆   {BD}Q W E N   2 . 5   ◆ ◆ ◆{RS}{CY}           {DB}║{RS}
-{DB}  ╠{'═'*54}╣{RS}
-{DB}  ║{RS}                                                      {DB}║{RS}
-{DB}  ║{RS}  {AC3}  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓{RS}            {DB}║{RS}
-{DB}  ║{RS}  {BD}{CY}  Instruct · 14B · 4-bit{RS}                         {DB}║{RS}
-{DB}  ║{RS}  {GR}  Apple {dev} · {ram:.0f} GB unified{RS}                    {DB}║{RS}
-{DB}  ║{RS}  {GR}  Temp {TEMP} · Top-p {TOP_P} · offline · MLX{RS}            {DB}║{RS}
-{DB}  ║{RS}  {MG}  ◈ multilingual · 20 languages{RS}                  {DB}║{RS}
-{DB}  ║{RS}                                                      {DB}║{RS}
-{DB}  ╚{'═'*54}╝{RS}
-""")
-
-
-def _banner_qwen35():
-    try:    dev = mx.device_info().get("device_name", "M3").removeprefix("Apple ")
-    except: dev = "M3"
-    ram = psutil.virtual_memory().total / (1024 ** 3)
-    print(f"""
-{DB}  ╔{'═'*54}╗{RS}
-{DB}  ║{RS}{CY}    ◆ ◆ ◆   {BD}Q W E N   3 . 5   ◆ ◆ ◆{RS}{CY}           {DB}║{RS}
-{DB}  ╠{'═'*54}╣{RS}
-{DB}  ║{RS}                                                      {DB}║{RS}
-{DB}  ║{RS}  {AC3}  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓{RS}            {DB}║{RS}
-{DB}  ║{RS}  {BD}{CY}  Dense · 27B · 4-bit{RS}                            {DB}║{RS}
-{DB}  ║{RS}  {GR}  Apple {dev} · {ram:.0f} GB unified{RS}                    {DB}║{RS}
-{DB}  ║{RS}  {GR}  Temp {TEMP} · Top-p {TOP_P} · offline · MLX{RS}            {DB}║{RS}
-{DB}  ║{RS}  {MG}  ◈ latest Qwen · deep reasoning{RS}                  {DB}║{RS}
-{DB}  ║{RS}                                                      {DB}║{RS}
-{DB}  ╚{'═'*54}╝{RS}
-""")
-
-
-def _banner_generic(key: str):
-    """Generic banner for models without a dedicated banner function."""
-    mdl = MODELS.get(key, MODELS["dolphin"])
-    try:    dev = mx.device_info().get("device_name", "Apple Silicon")
-    except: dev = "Apple Silicon"
-    ram = psutil.virtual_memory().total / (1024 ** 3)
-    is_unf = mdl["profile"] == "unfiltered"
-    col = c(196) if is_unf else CY
-    tag = "abliterated · no limits" if is_unf else "offline · no cloud · MLX"
-    print(f"""
-{DB}  ╔{'═'*54}╗{RS}
-{DB}  ║{RS}{col}    ◈ ◈ ◈   {BD}{mdl['label'][:36]}{RS}{col}   {DB}║{RS}
-{DB}  ╠{'═'*54}╣{RS}
-{DB}  ║{RS}                                                      {DB}║{RS}
-{DB}  ║{RS}  {col}  {mdl['size']:>4}  · {mdl['id'].split('/')[-1][:30]}{RS}  {DB}║{RS}
-{DB}  ║{RS}  {GR}  Apple {dev} · {ram:.0f} GB unified{RS}                {DB}║{RS}
-{DB}  ║{RS}  {GR}  Temp {TEMP} · Top-p {TOP_P} · {tag}{RS}       {DB}║{RS}
-{DB}  ║{RS}                                                      {DB}║{RS}
-{DB}  ╚{'═'*54}╝{RS}
-""")
-
-
+# ── Banner ───────────────────────────────────────────────────────
 def _banner(key: str):
-    if key == "qwen35":
-        _banner_qwen35()
-    elif key == "qwen":
-        _banner_qwen()
-    elif key == "dolphin":
-        _banner_dolphin()
+    """Universal banner — reads from MODELS, detects hardware dynamically."""
+    mdl = MODELS.get(key, MODELS["dolphin"])
+    try:    dev = mx.device_info().get("device_name", "Apple Silicon").removeprefix("Apple ")
+    except: dev = "Apple Silicon"
+    ram     = psutil.virtual_memory().total / (1024 ** 3)
+    is_unf  = mdl["profile"] == "unfiltered"
+    is_dolp = mdl["prompt"]  == "dolphin"
+    col = c(196) if is_unf else (MG if is_dolp else CY)
+    tag = "abliterated · no limits" if is_unf else "offline · MLX"
+
+    W = 54
+    bar = "═" * W
+
+    def _row(content: str) -> str:
+        pad = " " * max(0, W - _vlen(content))
+        return f"{DB}  ║{RS}{content}{pad}{DB}║{RS}"
+
+    parts        = [p.strip() for p in mdl["label"].split("·")]
+    model_name   = parts[0]
+    model_detail = " · ".join(parts[1:]) if len(parts) > 1 else mdl["size"]
+
+    print(f"\n{DB}  ╔{bar}╗{RS}")
+    if is_dolp:
+        hdr = f"{MG}  ≋ ≋ ≋  {BD}{model_name.upper()}{RS}{MG}  ≋ ≋ ≋"
+        print(_row(hdr))
+        print(f"{DB}  ╠{bar}╣{RS}")
+        print(_row(""))
+        print(_row(f"  {DB}     ____{RS}      {BD}{CY}{model_detail}{RS}"))
+        print(_row(f"  {MG}   /      \\{RS}     {GR}Apple {dev} · {ram:.0f} GB unified{RS}"))
+        print(_row(f"  {MG}  |  {CY}◈{MG}     |{RS}     {GR}Temp {TEMP} · Top-p {TOP_P}{RS}"))
+        print(_row(f"  {MG}   \\______/{RS}     {GR}{tag}{RS}"))
+        print(_row(f"  {MG}    \\___~_/{RS}     {GR}localai · offline LLM for Mac{RS}"))
+        print(_row(""))
     else:
-        _banner_generic(key)
+        hdr = f"{col}    ◆ ◆ ◆   {BD}{model_name}{RS}{col}   "
+        print(_row(hdr))
+        print(f"{DB}  ╠{bar}╣{RS}")
+        print(_row(""))
+        print(_row(f"  {AC3}  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓{RS}"))
+        print(_row(f"  {BD}{col}  {model_detail}{RS}"))
+        print(_row(f"  {GR}  Apple {dev} · {ram:.0f} GB unified{RS}"))
+        print(_row(f"  {GR}  Temp {TEMP} · Top-p {TOP_P} · {tag}{RS}"))
+        print(_row(f"  {GR}  localai · offline LLM for Mac{RS}"))
+        print(_row(""))
+    print(f"{DB}  ╚{bar}╝{RS}")
 
 
 def _sysinfo(cfg: dict):
     pass  # info is now inside the banner
+
+
+def _chat_header(key: str):
+    """Compact one-line model indicator + stats + commands."""
+    if UI_MODE == "zen":
+        return
+    mdl    = MODELS.get(key, MODELS["dolphin"])
+    is_unf = mdl["profile"] == "unfiltered"
+    col    = c(196) if is_unf else CY
+    parts  = [p.strip() for p in mdl["label"].split("·")]
+    name   = parts[0]
+    size   = parts[1] if len(parts) > 1 else mdl["size"]
+    try:    dev = mx.device_info().get("device_name", "Apple Silicon").removeprefix("Apple ")
+    except: dev = "Apple Silicon"
+    ram = psutil.virtual_memory().total / (1024 ** 3)
+    print(f"\n  {BD}{col}◈ {name}{RS}  {DB}·  {size}  ·  {dev} {ram:.0f}GB  ·  ✈{RS}")
+    _print_header()
+    _cmds()
 
 
 # ── Spinner ──────────────────────────────────────────────────────
@@ -595,9 +688,80 @@ class _Spin:
         sys.stdout.flush()
 
 
+def _is_downloaded(model_id: str) -> bool:
+    """Return True if model exists in local HF hub cache."""
+    slug    = model_id.replace("/", "--")
+    snap    = os.path.expanduser(f"~/.cache/huggingface/hub/models--{slug}/snapshots")
+    return os.path.isdir(snap) and bool(os.listdir(snap))
+
+
+def _suggested_model_key(ram_gb: float, unfiltered: bool = False) -> str:
+    """Largest safe model that fits RAM; for wizard and defaults."""
+    profile_ok = "unfiltered" if unfiltered else "safe"
+    candidates = [
+        (k, v) for k, v in MODELS.items()
+        if v["min_ram"] <= ram_gb and v.get("profile") == profile_ok
+    ]
+    if not candidates:
+        return "dolphin"
+    return max(candidates, key=lambda x: x[1]["min_ram"])[0]
+
+
+def _first_run_wizard(saved: dict) -> tuple:
+    """Guided first-run: hw + suggested model, personality, then tip. Returns (default_model_key,)."""
+    global CURRENT_PERSONALITY
+    hw = _hw_detect()
+    ram_gb = hw["ram_gb"]
+    chip = hw.get("chip", "Apple Silicon")
+    if len(chip) > 32:
+        chip = chip[:29] + "..."
+    suggested = _suggested_model_key(ram_gb, unfiltered=False)
+    suggested_label = MODELS[suggested]["label"].split("·")[0].strip()
+
+    sys.stdout.write("\033[2J\033[H")
+    sys.stdout.flush()
+    _apply_theme(saved.get("theme", "neon"))
+
+    # Step 1: hardware + suggested model
+    print(f"\n  {BD}{CY}localai · offline LLM for Mac{RS}")
+    print(f"  {DB}{'─' * 44}{RS}")
+    print(f"  {GR}Chip{RS}  {CY}{chip}{RS}")
+    print(f"  {GR}RAM{RS}  {CY}{int(ram_gb)} GB{RS}")
+    print()
+    print(f"  {GR}Vi föreslår modell{RS} {BD}{CY}{suggested_label}{RS} {GR}för din maskin.{RS}")
+    print(f"  {GR}Ok? [Enter]  eller ändra i nästa steg.{RS}")
+    print(f"  {DB}›{RS} ", end="", flush=True)
+    try:
+        step1 = input().strip()
+    except (EOFError, KeyboardInterrupt):
+        step1 = ""
+    default_model = suggested if step1 == "" else saved.get("model", "dolphin")
+
+    # Step 2: personality
+    print()
+    print(f"  {GR}Personlighet (1–11):{RS}")
+    for n, p in list(PERSONALITIES.items())[:5]:
+        print(f"    {CY}{n}{RS}  {p['name']:<10}  {GR}{p['desc'][:32]}{RS}")
+    print(f"    {GR}… 6–11 i settings (s) senare.{RS}")
+    print(f"  {DB}›{RS} ", end="", flush=True)
+    try:
+        step2 = input().strip()
+    except (EOFError, KeyboardInterrupt):
+        step2 = ""
+    if step2.isdigit() and 1 <= int(step2) <= len(PERSONALITIES):
+        CURRENT_PERSONALITY = int(step2)
+
+    # Step 3: tip
+    print()
+    print(f"  {CY}✓{RS} {GR}Nu räcker det att du skriver {CY}llm{RS} {GR}för att starta, {CY}q{RS} {GR}för att avsluta.{RS}")
+    print()
+
+    return (default_model,)
+
+
 # ── Model picker ─────────────────────────────────────────────────
 def _pick_model(default_key: str = "dolphin"):
-    """Dynamic model picker — filters by RAM tier and active profile."""
+    """Dynamic model picker — only shows locally cached models."""
     _apply_theme("neon")
     sys.stdout.write("\033[2J\033[H")
     sys.stdout.flush()
@@ -610,12 +774,15 @@ def _pick_model(default_key: str = "dolphin"):
     try:    gpu_gb = mx.get_active_memory() / (1024 ** 3)
     except: gpu_gb = 0.0
 
-    # Filter models by RAM and active profile
-    available = {
+    # Only show models that are downloaded + fit RAM + match profile
+    _fits = {
         k: v for k, v in MODELS.items()
         if v["min_ram"] <= ram_gb
         and (v["profile"] == "safe" or UNFILTERED_MODE)
     }
+    available = {k: v for k, v in _fits.items() if _is_downloaded(v["id"])}
+    if not available:
+        available = _fits  # nothing downloaded yet — show all that fit
     if not available:
         available = {"dolphin": MODELS["dolphin"]}
     if default_key not in available:
@@ -623,14 +790,17 @@ def _pick_model(default_key: str = "dolphin"):
 
     model_nums = {str(i + 1): k for i, k in enumerate(available.keys())}
 
+    try:    chip = mx.device_info().get("device_name", "Apple Silicon").removeprefix("Apple ")
+    except: chip = "Apple Silicon"
+
     # ── Header ───────────────────────────────────────────────────
-    mode_tag = f"  {c(196)}UNFILTERED{RS}" if UNFILTERED_MODE else ""
-    title_raw = f"  L O C A L A I  ·  M O D E L  S E L E C T{mode_tag}"
+    mode_tag  = f"  {c(196)}UNFILTERED{RS}" if UNFILTERED_MODE else ""
+    title_raw = f"  SELECT YOUR LOCAL INTELLIGENCE CORE{mode_tag}"
     title_pad = " " * max(0, W - _vlen(title_raw) - 2)
     print(f"\n{c(51)}  ╔{BAR}╗{RS}")
     print(f"{c(51)}  ║{RS}  {BD}{c(51)}{title_raw}{title_pad}{RS}{c(51)}║{RS}")
     print(f"{c(51)}  ╠{BAR}╣{RS}")
-    hw_raw = f"  RAM {ram_gb:.0f} GB  ·  Swap {swap_gb:.1f} GB  ·  GPU {gpu_gb:.1f} GB  ·  offline"
+    hw_raw = f"  {chip}  ·  {ram_gb:.0f} GB  ·  ✈ offline"
     hw_pad = " " * max(0, W - _vlen(hw_raw) - 2)
     print(f"{c(51)}  ║{RS}{c(242)}{hw_raw}{hw_pad}{RS}  {c(51)}║{RS}")
     print(f"{c(51)}  ╠{BAR}╣{RS}")
@@ -641,27 +811,27 @@ def _pick_model(default_key: str = "dolphin"):
         is_def = key == default_key
         is_unf = mdl["profile"] == "unfiltered"
 
-        nc     = c(196) if is_unf else (c(226) if "32" in mdl["size"] else c(135) if mdl["size"] in ("14B", "27B") else c(51))
-        dmark  = f"  {CY}▸{RS}" if is_def else "   "
-        label  = mdl["label"]
-        note   = f"min {mdl['min_ram']} GB" + (" · uncensored" if is_unf else "")
+        nc    = c(196) if is_unf else (c(226) if "32" in mdl["size"] or "70" in mdl["size"] else c(135) if mdl["size"] in ("14B", "24B", "27B") else c(51))
+        dmark = f"  {CY}▸{RS}" if is_def else "   "
+        parts = [p.strip() for p in mdl["label"].split("·")]
+        name  = parts[0]
+        detail = " · ".join(parts[1:]) if len(parts) > 1 else mdl["size"]
+        dl    = mdl.get("dl_size", "")
+        tag   = f"  {c(196)}uncensored{RS}" if is_unf else ""
+        dl_s  = f"  {c(242)}{dl}{RS}" if dl else ""
 
-        empty  = " " * (W - 2)
-        row1_c = f"{dmark} {BD}{nc}{num}{RS}  {BD}{label}{RS}"
+        row1_c = f"{dmark} {BD}{nc}{num}{RS}  {BD}{name}{RS}  {c(242)}{detail}{RS}{tag}{dl_s}"
         row1_p = " " * max(0, W - _vlen(row1_c))
-        row2_c = f"      {c(242)}{note}{RS}"
-        row2_p = " " * max(0, W - _vlen(row2_c))
 
-        print(f"{c(51)}  ║{RS}{empty}{c(51)}║{RS}")
+        print(f"{c(51)}  ║{RS}{' ' * (W - 2)}{c(51)}║{RS}")
         print(f"{c(51)}  ║{RS}{row1_c}{row1_p}{c(51)}║{RS}")
-        print(f"{c(51)}  ║{RS}{row2_c}{row2_p}{c(51)}║{RS}")
 
     print(f"{c(51)}  ║{RS}{' ' * (W - 2)}{c(51)}║{RS}")
     print(f"{c(51)}  ╚{BAR}╝\n{RS}")
 
     # ── Input loop ───────────────────────────────────────────────
     chosen   = None
-    deadline = time.time() + 10.0
+    deadline = time.time() + max(0.0, PICK_TIMEOUT)
     def_label = available[default_key]["label"][:26]
     nums_hint = " / ".join(
         f"{c(196) if available[k]['profile']=='unfiltered' else c(51)}{n}{RS}"
@@ -704,6 +874,24 @@ def _rm_pid():
     except OSError: pass
 
 
+def _voice_api():
+    """Lazy-load voice support so plain text chat starts without whisper/audio imports."""
+    global _VOICE_API
+    if _VOICE_API is None:
+        from voice import (
+            check_available,
+            install_instructions,
+            push_to_talk,
+        )
+
+        _VOICE_API = {
+            "check_available": check_available,
+            "install_instructions": install_instructions,
+            "push_to_talk": push_to_talk,
+        }
+    return _VOICE_API
+
+
 # ── Main ─────────────────────────────────────────────────────────
 def main():
     global TEMP, CURRENT_PERSONALITY, CURRENT_THEME, UNFILTERED_MODE
@@ -716,32 +904,69 @@ def main():
                         help="Skip picker and load a specific model key")
     parser.add_argument("--voice", action="store_true",
                         help="Enable push-to-talk voice input (requires mlx-whisper)")
+    parser.add_argument("--zen", action="store_true",
+                        help="Minimal UI — no header, no stats, just chat")
+    parser.add_argument("--focus", action="store_true",
+                        help="Show header at start only, compact stats")
     args, _ = parser.parse_known_args()
 
     # ── Load persistent config ────────────────────────────────────
     saved = _cfg_load()
     TEMP               = float(saved.get("temp",        TEMP))
     CURRENT_PERSONALITY = int(saved.get("personality", CURRENT_PERSONALITY))
+    SHOW_STATS         = str(saved.get("stats",        SHOW_STATS))
+    PRIVACY_MODE       = bool(saved.get("privacy_mode", PRIVACY_MODE))
+    LOG_SESSIONS       = bool(saved.get("log_sessions", LOG_SESSIONS))
+    UI_MODE            = str(saved.get("ui_mode",      UI_MODE))
     _apply_theme(saved.get("theme", CURRENT_THEME))
     default_model = args.model or saved.get("model", "dolphin")
+
+    if args.zen:
+        UI_MODE = "zen"
+    elif args.focus:
+        UI_MODE = "focus"
+
+    from agent import set_logging as _set_logging
+    _set_logging(LOG_SESSIONS and not PRIVACY_MODE)
+
+    # ── First-run wizard ──────────────────────────────────────────
+    first_run = saved.get("first_run", True)
+    if first_run:
+        (default_model,) = _first_run_wizard(saved)
+        saved["model"] = default_model
+        saved["personality"] = CURRENT_PERSONALITY
+        saved["first_run"] = False
+        _cfg_save(saved)
 
     # ── Unfiltered mode ───────────────────────────────────────────
     UNFILTERED_MODE = args.unfiltered
     if UNFILTERED_MODE:
         sys.stdout.write("\033[2J\033[H")
         sys.stdout.flush()
-        print(f"\n  {c(196)}{'═' * 54}{RS}")
-        print(f"  {c(196)}  ⚠  UNFILTERED MODE{RS}")
-        print(f"  {c(196)}{'═' * 54}{RS}")
-        print(f"\n  {GR}Uncensored models (abliterated) will be unlocked.{RS}")
-        print(f"  {GR}These models have no safety filters by design.{RS}")
-        print(f"\n  {GR}Type {CY}yes{GR} to continue, anything else to exit:{RS} ", end="", flush=True)
+        RD = c(196)
+        W  = 54
+        bar = "═" * W
+        def _ur(content: str) -> str:
+            pad = " " * max(0, W - _vlen(content))
+            return f"{RD}  ║{RS}{content}{pad}{RD}║{RS}"
+        print(f"\n{RD}  ╔{bar}╗{RS}")
+        print(_ur(f"  ⚠   U N F I L T E R E D   M O D E"))
+        print(f"{RD}  ╠{bar}╣{RS}")
+        print(_ur(""))
+        print(_ur(f"  {c(242)}This enables abliterated models.{RS}"))
+        print(_ur(f"  {c(242)}No safety alignment. No restrictions.{RS}"))
+        print(_ur(""))
+        print(_ur(f"  {c(242)}These models run fully offline on your hardware.{RS}"))
+        print(_ur(f"  {c(242)}You are solely responsible for their output.{RS}"))
+        print(_ur(""))
+        print(f"{RD}  ╚{bar}╝{RS}")
+        print(f"\n  {c(242)}Type {RD}UNLOCK{RS}{c(242)} to continue, anything else to exit:{RS} ", end="", flush=True)
         try:
-            confirm = input().strip().lower()
+            confirm = input().strip()
         except (EOFError, KeyboardInterrupt):
             print(); sys.exit(0)
-        if confirm != "yes":
-            print(f"\n  {GR}Exiting.{RS}\n")
+        if confirm != "UNLOCK":
+            print(f"\n  {c(242)}Exiting.{RS}\n")
             sys.exit(0)
 
     # ── Pre-flight before anything else ──────────────────────────
@@ -763,11 +988,17 @@ def main():
         except Exception: pass
 
     def _save_cfg():
+        if PRIVACY_MODE:
+            return
         _cfg_save({
-            "model":       model_key,
-            "theme":       CURRENT_THEME,
-            "personality": CURRENT_PERSONALITY,
-            "temp":        TEMP,
+            "model":        model_key,
+            "theme":        CURRENT_THEME,
+            "personality":  CURRENT_PERSONALITY,
+            "temp":         TEMP,
+            "stats":        SHOW_STATS,
+            "log_sessions": LOG_SESSIONS,
+            "privacy_mode": PRIVACY_MODE,
+            "ui_mode":      UI_MODE,
         })
 
     def _exit(sig=None, _frame=None):
@@ -781,7 +1012,10 @@ def main():
         print()
         print(f"  {DB}{'─' * 40}{RS}")
         print(f"  {GR}Session ended · {CY}{msgs}{GR} msgs · {CY}{m}m {s}s{RS}")
-        print(f"  {GR}Metal cache cleared · memory freed.{RS}")
+        if PRIVACY_MODE:
+            print(f"  {GR}No data saved. Metal cache cleared.{RS}")
+        else:
+            print(f"  {GR}Metal cache cleared · memory freed.{RS}")
         print()
         _save_cfg()
         _release()
@@ -795,11 +1029,15 @@ def main():
     # ── Load ─────────────────────────────────────────────────────
     sys.stdout.write("\033[2J\033[H")
     sys.stdout.flush()
-    _banner(model_key)
-    _sysinfo(cfg)
 
     if cfg.get("min_ram", 0) >= 20:
         _free_memory_for_large_model(label=cfg["label"], min_ram=cfg["min_ram"])
+
+    # Lazy-import mlx_lm so model picker shows faster (heavy deps load after choice)
+    from mlx_lm import load
+    from mlx_lm.generate import stream_generate
+    from mlx_lm.models.cache import make_prompt_cache
+    from mlx_lm.sample_utils import make_sampler
 
     with _Spin(f"Loading {cfg['label']}"):
         old_err, sys.stderr = sys.stderr, open(os.devnull, "w")
@@ -811,6 +1049,17 @@ def main():
 
     cache   = make_prompt_cache(model, MAX_KV)
     sampler = make_sampler(temp=TEMP, top_p=TOP_P)
+
+    # Warmup Metal/GPU so first user message isn't cold (1–2 token run, discarded; no cache to keep it clean)
+    try:
+        warm_prompt = tokenizer.apply_chat_template(
+            [{"role": "user", "content": "Hi"}],
+            add_generation_prompt=True,
+        )
+        for _ in stream_generate(model, tokenizer, warm_prompt, max_tokens=2, sampler=sampler):
+            pass
+    except Exception:
+        pass
 
     SYSTEM_PROMPTS = {
         "dolphin": """\
@@ -834,6 +1083,34 @@ Personality: precise, direct, confident. You think before speaking and say what 
 - Give real opinions when asked. Don't dodge.
 - You can be dry/deadpan. That's fine.
 """,
+        "phi": """\
+You are Phi — a compact, precise local AI running offline on Apple Silicon via MLX.
+You are technical, concise, and reliable. You think step-by-step when needed.
+- Short answers by default. Code when code is asked for.
+- No filler. No "Sure!" or "Absolutely!".
+- If the question is ambiguous, ask one clarifying question.
+""",
+        "gemma": """\
+You are Gemma — a lightweight local AI running offline on Apple Silicon via MLX.
+You are helpful, clear, and neutral. You give well-structured answers.
+- Short by default. Detailed when the topic warrants it.
+- No corporate speak. No unnecessary disclaimers.
+- If you don't know something, say so directly.
+""",
+        "llama": """\
+You are Llama — Meta's open-source LLM running locally on Apple Silicon via MLX.
+No cloud, no tracking, fully offline. You're direct and have personality.
+- Short and punchy by default. Match the user's energy.
+- No "Certainly!" or "Great question!" — just answer.
+- Have opinions when asked. Be real.
+""",
+        "mistral": """\
+You are Mistral — a European open-source AI running locally on Apple Silicon via MLX.
+You are precise, multilingual, and efficient. You value clarity over verbosity.
+- Short answers by default. Expand only when needed.
+- No filler phrases. Straight to the point.
+- You can handle multiple languages naturally.
+""",
     }
 
     # system_prompt is resolved each turn from CURRENT_PERSONALITY / SYSTEM_PROMPTS
@@ -844,7 +1121,7 @@ Personality: precise, direct, confident. You think before speaking and say what 
         if CURRENT_PERSONALITY != 1:
             base = PERSONALITIES[CURRENT_PERSONALITY]["prompt"]
         else:
-            base = BASE_PROMPTS.get(model_key, BASE_PROMPTS["dolphin"])
+            base = BASE_PROMPTS.get(LABEL, BASE_PROMPTS["dolphin"])
         if CUSTOM_INSTRUCTIONS:
             base += f"\n\nAdditional instructions from user:\n{CUSTOM_INSTRUCTIONS}"
         return base
@@ -852,25 +1129,26 @@ Personality: precise, direct, confident. You think before speaking and say what 
     # ── Chat UI ──────────────────────────────────────────────────
     sys.stdout.write("\033[2J\033[H")
     sys.stdout.flush()
-    _banner(model_key)
-    _print_header()
-    _cmds()
+    _chat_header(model_key)
 
     def sep():
         cols = shutil.get_terminal_size().columns
         print(f"  {DB}{'╌' * min(cols - 4, 54)}{RS}")
 
+    voice_api = None
     VOICE_MODE = args.voice
-    if VOICE_MODE and not _voice_ok():
+    if VOICE_MODE:
+        voice_api = _voice_api()
+    if VOICE_MODE and not voice_api["check_available"]():
         print(f"\n  {YL}⚠  Voice mode not available.{RS}")
-        print(f"  {GR}{_voice_install_msg()}{RS}\n")
+        print(f"  {GR}{voice_api['install_instructions']()}{RS}\n")
         VOICE_MODE = False
 
     # ── Chat loop ─────────────────────────────────────────────────
     while True:
         if VOICE_MODE:
             print(f"  {BD}{CY}you{RS} {DB}›{RS} ", end="", flush=True)
-            user = _voice_push(prompt_fn=lambda m: sys.stdout.write(f"\r{m}\n"))
+            user = voice_api["push_to_talk"](prompt_fn=lambda m: sys.stdout.write(f"\r{m}\n"))
             if not user:
                 sys.stdout.write("\033[A\033[2K")
                 sys.stdout.flush()
@@ -898,9 +1176,7 @@ Personality: precise, direct, confident. You think before speaking and say what 
             _save_cfg()
             sys.stdout.write("\033[3J\033[2J\033[H")
             sys.stdout.flush()
-            _banner(model_key)
-            _print_header()
-            _cmds()
+            _chat_header(model_key)
             continue
 
         if cmd == "r":
@@ -917,13 +1193,22 @@ Personality: precise, direct, confident. You think before speaking and say what 
         if cmd in {"rensa", "/rensa", "clear", "/clear", "cls"}:
             sys.stdout.write("\033[3J\033[2J\033[H")
             sys.stdout.flush()
-            _banner(model_key)
-            _print_header()
-            _cmds()
+            _chat_header(model_key)
             continue
 
         if cmd in {"/theme", "/themes"}:
             _theme_picker()
+            continue
+
+        if cmd == "v":
+            voice_api = voice_api or _voice_api()
+            if not voice_api["check_available"]():
+                print(f"\n  {YL}⚠  Voice mode not available.{RS}")
+                print(f"  {GR}{voice_api['install_instructions']()}{RS}\n")
+            else:
+                VOICE_MODE = not VOICE_MODE
+                state = f"{CY}ON{RS}" if VOICE_MODE else f"{c(242)}OFF{RS}"
+                print(f"  {GR}Voice:{RS} {state}\n")
             continue
 
         # ── Generate ─────────────────────────────────────────────
@@ -936,9 +1221,11 @@ Personality: precise, direct, confident. You think before speaking and say what 
             add_generation_prompt=True,
         )
 
-        full = ""
-        buf  = ""
-        last = time.time()
+        full        = ""
+        buf         = ""
+        last        = time.time()
+        gen_start   = time.time()
+        token_count = 0
         live_sampler = make_sampler(temp=TEMP, top_p=TOP_P)
 
         _pause_header(True)
@@ -955,6 +1242,7 @@ Personality: precise, direct, confident. You think before speaking and say what 
                 piece = tok.text
                 full += piece
                 buf  += piece
+                token_count += 1
                 now = time.time()
                 flush = (
                     "\n" in buf
@@ -980,24 +1268,40 @@ Personality: precise, direct, confident. You think before speaking and say what 
         finally:
             _pause_header(False)
 
+        lat_ms = int((time.time() - gen_start) * 1000)
+        try:    gpu_gb = mx.get_active_memory() / (1024 ** 3)
+        except: gpu_gb = 0.0
+        tps = token_count / max(0.001, (time.time() - gen_start))
+
         print()
         log_interaction(query=stripped, steps=[], final_answer=full, total_steps=0)
         sep()
+        if SHOW_STATS == "full":
+            print(
+                f"  {GR}Tokens: {token_count}  ·  "
+                f"Latency: {lat_ms}ms  ·  "
+                f"t/s: {tps:.1f}  ·  "
+                f"Temp: {TEMP}  ·  "
+                f"GPU: {gpu_gb:.1f}GB{RS}"
+            )
+        elif SHOW_STATS == "compact":
+            print(f"  {GR}t/s: {tps:.1f}  ·  GPU: {gpu_gb:.1f}GB{RS}")
         print()
 
 
 # ── Helpers ──────────────────────────────────────────────────────
 def _cmds():
+    if UI_MODE == "zen":
+        return
     cols = shutil.get_terminal_size().columns
     bar = f"{DB}{'─' * min(cols - 4, 54)}{RS}"
     print(f"  {bar}")
-    print(
-        f"  {CY}q{RS} quit  "
-        f"{CY}r{RS} reset  "
-        f"{CY}s{RS} settings  "
-        f"{CY}rensa{RS} clear  "
-        f"{CY}h{RS} help"
-    )
+    print(f"  {CY}q{RS} quit      {GR}avsluta sessionen{RS}")
+    print(f"  {CY}r{RS} reset     {GR}rensa kontext / minne{RS}")
+    print(f"  {CY}s{RS} settings  {GR}temperatur, personlighet, privacy m.m.{RS}")
+    print(f"  {CY}v{RS} voice     {GR}push-to-talk (kräver mlx-whisper){RS}")
+    print(f"  {CY}rensa{RS}       {GR}rensa skärmen{RS}")
+    print(f"  {CY}h{RS} help      {GR}visa detta{RS}")
     print(f"  {bar}\n")
 
 
@@ -1026,25 +1330,27 @@ def _theme_picker():
 
 
 def _settings_menu():
-    """Interactive settings: temperature + personality + custom instructions."""
-    global TEMP, CURRENT_PERSONALITY, CUSTOM_INSTRUCTIONS
+    """Interactive settings — 6 sections."""
+    global TEMP, CURRENT_PERSONALITY, CUSTOM_INSTRUCTIONS, SHOW_STATS, UI_MODE
+    global PRIVACY_MODE, LOG_SESSIONS
 
     while True:
         cols = shutil.get_terminal_size().columns
         bar  = f"{DB}{'═' * min(cols - 4, 54)}{RS}"
         p    = PERSONALITIES[CURRENT_PERSONALITY]
-        ci   = CUSTOM_INSTRUCTIONS[:40] + "…" if len(CUSTOM_INSTRUCTIONS) > 40 else CUSTOM_INSTRUCTIONS
+        pvt_s = f"{CY}ON{RS}" if PRIVACY_MODE else f"{GR}off{RS}"
+        log_s = f"{CY}ON{RS}" if LOG_SESSIONS else f"{GR}off{RS}"
         print(f"\n  {bar}")
         print(f"  {BD}{CY}  S E T T I N G S{RS}")
         print(f"  {bar}")
-        print(f"  {GR}Personality:{RS} {BD}{CY}{p['name']}{RS}  {GR}· Temp:{RS} {CY}{TEMP}{RS}")
-        if CUSTOM_INSTRUCTIONS:
-            print(f"  {GR}Custom:{RS} {CY}{ci}{RS}")
-        print(f"  {bar}")
-        print(f"\n  {CY}1{RS}  Temperature")
-        print(f"  {CY}2{RS}  Personality")
-        print(f"  {CY}3{RS}  Custom instructions  {GR}(session only){RS}")
-        print(f"\n  {GR}Enter 1 / 2 / 3  (Enter to go back):{RS} ", end="", flush=True)
+        print(f"\n  {CY}1{RS}  Temperature    {CY}{TEMP}{RS}       {GR}Hur kreativ / slumpmässig modellen är{RS}")
+        print(f"  {CY}2{RS}  Personality     {CY}{p['name']}{RS}     {GR}Systemprompten — modellens personlighet{RS}")
+        print(f"  {CY}3{RS}  Stats display   {CY}{SHOW_STATS}{RS}   {GR}Vad som visas under varje svar{RS}")
+        print(f"  {CY}4{RS}  UI Mode         {CY}{UI_MODE}{RS}  {GR}Hur mycket gränssnitt som visas{RS}")
+        print(f"  {CY}5{RS}  Privacy         {pvt_s}  Log: {log_s}  {GR}Styr vad som sparas till disk{RS}")
+        ci_s = CUSTOM_INSTRUCTIONS[:20] + "…" if len(CUSTOM_INSTRUCTIONS) > 20 else (CUSTOM_INSTRUCTIONS or "—")
+        print(f"  {CY}6{RS}  Custom          {GR}{ci_s}{RS}     {GR}Extra instruktioner (glöms vid exit){RS}")
+        print(f"\n  {GR}Enter 1–6  (Enter to go back):{RS} ", end="", flush=True)
         try:
             ch = input().strip()
         except (EOFError, KeyboardInterrupt):
@@ -1055,6 +1361,12 @@ def _settings_menu():
         elif ch == "2":
             _settings_persona()
         elif ch == "3":
+            _settings_stats()
+        elif ch == "4":
+            _settings_ui_mode()
+        elif ch == "5":
+            _settings_privacy()
+        elif ch == "6":
             _settings_custom()
         else:
             break
@@ -1129,6 +1441,112 @@ def _settings_custom():
     else:
         CUSTOM_INSTRUCTIONS = txt
         print(f"  {GR}Custom instructions set:{RS} {CY}{txt[:50]}{RS}\n")
+
+
+def _settings_stats():
+    global SHOW_STATS
+    _OPTS = [("compact", "t/s + GPU only"), ("full", "All fields (tokens, latency, t/s, temp, GPU)"), ("off", "No stats shown")]
+    cols = shutil.get_terminal_size().columns
+    bar  = f"{DB}{'─' * min(cols - 4, 54)}{RS}"
+    print(f"\n  {BD}Stats Display{RS}  {GR}(what shows after each response){RS}\n")
+    for i, (val, desc) in enumerate(_OPTS, 1):
+        mark = f"  {CY}*{RS}" if val == SHOW_STATS else "   "
+        print(f"{mark} {CY}{i}{RS}  {BD}{val:<8}{RS}  {GR}{desc}{RS}")
+    print(f"\n  {bar}")
+    print(f"  {GR}Enter 1–3 (Enter to cancel):{RS} ", end="", flush=True)
+    try:
+        ch = input().strip()
+    except (EOFError, KeyboardInterrupt):
+        print(); return
+    if ch.isdigit() and 1 <= int(ch) <= len(_OPTS):
+        SHOW_STATS = _OPTS[int(ch) - 1][0]
+        print(f"  {GR}Stats set to{RS} {CY}{SHOW_STATS}{RS}\n")
+    else:
+        print(f"  {GR}Unchanged.{RS}\n")
+
+
+def _settings_ui_mode():
+    global UI_MODE
+    _OPTS = [
+        ("normal", "Header + stats + commands — standard"),
+        ("zen",    "Clean — no header, no stats, just text"),
+        ("focus",  "Header at start only, compact stats"),
+    ]
+    cols = shutil.get_terminal_size().columns
+    bar  = f"{DB}{'─' * min(cols - 4, 54)}{RS}"
+    print(f"\n  {BD}UI Mode{RS}  {GR}(how much interface you see){RS}\n")
+    for i, (val, desc) in enumerate(_OPTS, 1):
+        mark = f"  {CY}*{RS}" if val == UI_MODE else "   "
+        print(f"{mark} {CY}{i}{RS}  {BD}{val:<8}{RS}  {GR}{desc}{RS}")
+    print(f"\n  {bar}")
+    print(f"  {GR}Enter 1–3 (Enter to cancel):{RS} ", end="", flush=True)
+    try:
+        ch = input().strip()
+    except (EOFError, KeyboardInterrupt):
+        print(); return
+    if ch.isdigit() and 1 <= int(ch) <= len(_OPTS):
+        UI_MODE = _OPTS[int(ch) - 1][0]
+        print(f"  {GR}UI mode set to{RS} {CY}{UI_MODE}{RS}\n")
+    else:
+        print(f"  {GR}Unchanged.{RS}\n")
+
+
+def _settings_privacy():
+    global PRIVACY_MODE, LOG_SESSIONS
+    cols = shutil.get_terminal_size().columns
+    bar  = f"{DB}{'─' * min(cols - 4, 54)}{RS}"
+    pvt = f"{CY}ON{RS}" if PRIVACY_MODE else f"{GR}off{RS}"
+    log = f"{CY}ON{RS}" if LOG_SESSIONS else f"{GR}off{RS}"
+    print(f"\n  {BD}Privacy & History{RS}\n")
+    print(f"  {CY}1{RS}  Privacy Mode     [{pvt}]   {GR}Nothing saved to disk. Config changes forgotten at exit.{RS}")
+    print(f"  {CY}2{RS}  Session Log      [{log}]   {GR}Save conversations to ~/.localai/logs/{RS}")
+    print(f"  {CY}3{RS}  View saved logs          {GR}List session files{RS}")
+    print(f"  {CY}4{RS}  Delete all logs          {GR}Wipe ~/.localai/logs/ with confirmation{RS}")
+    print(f"\n  {bar}")
+    print(f"  {GR}Enter 1–4 (Enter to go back):{RS} ", end="", flush=True)
+    try:
+        ch = input().strip()
+    except (EOFError, KeyboardInterrupt):
+        print(); return
+
+    if ch == "1":
+        PRIVACY_MODE = not PRIVACY_MODE
+        from agent import set_logging as _sl
+        _sl(LOG_SESSIONS and not PRIVACY_MODE)
+        state = f"{CY}ON{RS}" if PRIVACY_MODE else f"{GR}off{RS}"
+        print(f"  {GR}Privacy Mode:{RS} {state}\n")
+    elif ch == "2":
+        LOG_SESSIONS = not LOG_SESSIONS
+        from agent import set_logging as _sl
+        _sl(LOG_SESSIONS and not PRIVACY_MODE)
+        state = f"{CY}ON{RS}" if LOG_SESSIONS else f"{GR}off{RS}"
+        print(f"  {GR}Session Log:{RS} {state}\n")
+    elif ch == "3":
+        from agent import list_logs
+        logs = list_logs()
+        if not logs:
+            print(f"  {GR}No saved sessions.{RS}\n")
+        else:
+            print(f"\n  {GR}Saved sessions ({len(logs)}):{RS}")
+            for lf in logs[:10]:
+                print(f"    {CY}{os.path.basename(lf)}{RS}")
+            if len(logs) > 10:
+                print(f"    {GR}… and {len(logs) - 10} more{RS}")
+            print()
+    elif ch == "4":
+        print(f"  {YL}Delete all session logs? {CY}y{GR}/{CY}n{GR} › {RS}", end="", flush=True)
+        try:
+            confirm = input().strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print(); return
+        if confirm in ("y", "yes"):
+            from agent import delete_all_logs
+            count = delete_all_logs()
+            print(f"  {GR}Deleted {CY}{count}{GR} log files.{RS}\n")
+        else:
+            print(f"  {GR}Cancelled.{RS}\n")
+    else:
+        print(f"  {GR}Unchanged.{RS}\n")
 
 
 if __name__ == "__main__":

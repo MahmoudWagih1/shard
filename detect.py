@@ -3,6 +3,7 @@
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -39,11 +40,11 @@ def detect() -> dict:
     except Exception:
         disk_free_gb = 0.0
 
+    # Future-proof: match M1, M2, …, M5, M10, etc.
     chip_gen = ""
-    for g in ("M4", "M3", "M2", "M1"):
-        if g in chip:
-            chip_gen = g
-            break
+    m = re.search(r"M(\d+)\s", chip) or re.search(r"M(\d+)$", chip) or re.search(r"M(\d+)", chip)
+    if m:
+        chip_gen = f"M{m.group(1)}"
 
     chip_tier = ""
     for t in ("Ultra", "Max", "Pro"):
@@ -51,7 +52,7 @@ def detect() -> dict:
             chip_tier = t
             break
 
-    is_apple_silicon = "Apple" in chip and platform.machine() == "arm64"
+    is_apple_silicon = platform.machine() == "arm64" and ("Apple" in chip or bool(chip_gen))
     swap_risk = ram_gb < 24
 
     return {
@@ -69,20 +70,22 @@ def detect() -> dict:
 
 
 def tier(ram_gb: float) -> str:
-    """Map RAM to model tier name."""
-    if ram_gb >= 96: return "max"
-    if ram_gb >= 64: return "full"
-    if ram_gb >= 32: return "balanced"
-    if ram_gb >= 16: return "standard"
-    return "minimal"
+    """Map RAM to model tier name. Works for M1–M5+ and 8–512 GB."""
+    if ram_gb >= 96:  return "max"
+    if ram_gb >= 64:  return "full"
+    if ram_gb >= 32:  return "balanced"
+    if ram_gb >= 16:  return "standard"
+    if ram_gb >= 8:   return "minimal"
+    return "micro"
 
 
 _TIER_LABELS = {
-    "minimal":  "Minimal  · ≤8 GB  — Dolphin 8B or Qwen3-14B 3bit",
-    "standard": "Standard · 16 GB  — Qwen3-14B 4bit or Qwen3-32B 3bit",
-    "balanced": "Balanced · 32 GB  — Qwen3-32B 4bit or Huihui-27B",
-    "full":     "Full     · 64 GB  — Huihui-32B 4bit",
-    "max":      "Max      · 96 GB+ — Qwen3-32B 8bit, no constraints",
+    "micro":    "Micro    · <8 GB  — Phi-4 mini, Gemma 3 4B (tiny models only)",
+    "minimal":  "Minimal  · 8 GB   — Dolphin 8B, Mistral 7B, Qwen3-8B",
+    "standard": "Standard · 16 GB  — Gemma 12B, Qwen3-14B, Qwen3-32B 3bit (incl. M5)",
+    "balanced": "Balanced · 32 GB  — Qwen3-32B 4bit, Mistral-24B, Huihui-27B",
+    "full":     "Full     · 64 GB  — Llama 3.3 70B 4bit, large models",
+    "max":      "Max      · 96 GB+ — Multiple large models simultaneously",
 }
 
 
