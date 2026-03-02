@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # localai — one-liner bootstrap
-# Usage: bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/install.sh)
+# Usage: bash <(curl -fsSL https://raw.githubusercontent.com/magido87/shard/main/install.sh)
 set -euo pipefail
 
-REPO_URL="${LOCALAI_REPO_URL:-https://github.com/YOUR_USER/YOUR_REPO.git}"
+REPO_URL="${LOCALAI_REPO_URL:-https://github.com/magido87/shard.git}"
 LOCALAI_DIR="$HOME/.localai"
 BRANCH="${LOCALAI_BRANCH:-main}"
 
