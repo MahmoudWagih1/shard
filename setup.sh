@@ -21,7 +21,7 @@ OK="${CY}✓${RS}"; FAIL="${RD}✗${RS}"
 # ── Header ──────────────────────────────────────────────────────
 echo
 echo -e "  ${BD}${CY}LOCALAI  ·  SETUP${RS}"
-echo -e "  ${GR}Vi installerar localai så att du kan skriva ${CY}llm${GR} i vilken terminal som helst.${RS}"
+echo -e "  ${GR}We'll set up localai so you can type ${CY}llm${GR} in any terminal.${RS}"
 echo
 
 # ── Hardware ────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ case "${MODEL_CHOICE,,}" in
         ;;
 esac
 
-# Download with progress
+# Download with visible progress (huggingface shows its own progress bar)
 if [ "${#MODELS_TO_DL[@]}" -gt 0 ]; then
     echo
     DL_I=0
@@ -134,17 +134,14 @@ if [ "${#MODELS_TO_DL[@]}" -gt 0 ]; then
     for item in "${MODELS_TO_DL[@]}"; do
         IFS='|' read -r mid mname <<< "$item"
         DL_I=$((DL_I + 1))
-        echo -ne "  ${GR}[${DL_I}/${DL_TOTAL}] ↓ ${mname}…${RS}"
-        "$VENV_DIR/bin/python" - <<PY 2>/dev/null
-import sys, time
-from mlx_lm import load
-frames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-try:
-    load('${mid}')
-except Exception as e:
-    print(f"\n  warning: {e}", file=sys.stderr)
-PY
-        echo -e "\r  ${OK} [${DL_I}/${DL_TOTAL}] ${mname}              "
+        echo -e "  ${GR}[${DL_I}/${DL_TOTAL}] Downloading ${BD}${mname}${RS}${GR}…${RS}"
+        echo
+        "$VENV_DIR/bin/python" -c "
+from huggingface_hub import snapshot_download
+snapshot_download('${mid}')
+"
+        echo
+        echo -e "  ${OK} [${DL_I}/${DL_TOTAL}] ${mname} ready"
     done
 fi
 
@@ -166,7 +163,7 @@ if [ "$INSTALL_VOICE" -eq 1 ]; then
     "$VENV_DIR/bin/pip" install --upgrade mlx-whisper sounddevice -q
     echo -e "\r  ${OK} voice ready                "
 else
-    echo -e "  ${GR}Voice skipped.  (setup.sh --voice to add later)${RS}"
+    echo -e "  ${GR}Voice skipped.  (run setup.sh --voice to add later)${RS}"
 fi
 
 # ── Copy py files (skip if already in place, e.g. git clone into ~/.localai) ─
@@ -229,5 +226,5 @@ mv "$tmp" "$ZSHRC"
 
 # ── Done ─────────────────────────────────────────────────────────
 echo
-echo -e "  ${OK} ${BD}Klar.${RS}  Öppna ny flik, skriv ${CY}llm${RS} och börja skriva. Inget mer."
+echo -e "  ${OK} ${BD}Done.${RS}  Open a new tab, type ${CY}llm${RS} and start chatting."
 echo
