@@ -21,12 +21,12 @@ OK="${CY}✓${RS}"; FAIL="${RD}✗${RS}"
 # ── Header ──────────────────────────────────────────────────────
 echo
 echo -e "  ${BD}${CY}LOCALAI  ·  SETUP${RS}"
-echo -e "  ${GR}Vi kommer installera localai så att du kan skriva ${CY}llm${GR} i vilken terminal som helst.${RS}"
+echo -e "  ${GR}Vi installerar localai så att du kan skriva ${CY}llm${GR} i vilken terminal som helst.${RS}"
 echo
 
 # ── Hardware ────────────────────────────────────────────────────
 if ! command -v python3 >/dev/null 2>&1; then
-    echo -e "  ${FAIL} python3 not found"; exit 1
+    echo -e "  ${FAIL} python3 not found — install Xcode CLI tools: xcode-select --install"; exit 1
 fi
 
 HW_JSON="$(python3 "$SCRIPT_DIR/detect.py" --json 2>/dev/null || echo '{}')"
@@ -38,23 +38,24 @@ echo -e "  ${GR}${CHIP}  ·  ${RAM_GB} GB RAM${RS}"
 echo
 
 if [ "$IS_AS" != "yes" ]; then
-    echo -e "  ${FAIL} MLX requires Apple Silicon. Exiting."; exit 1
+    echo -e "  ${FAIL} MLX requires Apple Silicon (M1 or later)."; exit 1
 fi
 
 # ── Venv ────────────────────────────────────────────────────────
 if [ -d "$VENV_DIR" ]; then
     echo -e "  ${OK} venv ready"
 else
+    echo -ne "  ${GR}creating venv…${RS}"
     mkdir -p "$LOCALAI_DIR"
     python3 -m venv "$VENV_DIR"
-    echo -e "  ${OK} venv created"
+    echo -e "\r  ${OK} venv created       "
 fi
 
 # ── Dependencies ─────────────────────────────────────────────────
-echo -ne "  ${GR}installing mlx-lm…${RS}"
+echo -ne "  ${GR}installing dependencies…${RS}"
 "$VENV_DIR/bin/pip" install --upgrade pip setuptools wheel -q
 "$VENV_DIR/bin/pip" install --upgrade mlx-lm psutil -q
-echo -e "\r  ${OK} mlx-lm, psutil        "
+echo -e "\r  ${OK} mlx-lm + psutil         "
 
 # ── Model selection ──────────────────────────────────────────────
 echo
@@ -78,6 +79,16 @@ declare -a MODEL_LIST=(
     "hui35|huihui-ai/Huihui-Qwen3.5-35B-A3B-abliterated|Huihui 35B|unfiltered · MoE|20|unfiltered"
 )
 
+# Pick ONE recommended model per RAM tier
+BEST_KEY=""
+if   [ "$RAM_GB" -ge 40 ]; then BEST_KEY="llama70"
+elif [ "$RAM_GB" -ge 20 ]; then BEST_KEY="q32"
+elif [ "$RAM_GB" -ge 14 ]; then BEST_KEY="q14"
+elif [ "$RAM_GB" -ge 10 ]; then BEST_KEY="gemma12"
+elif [ "$RAM_GB" -ge 8 ];  then BEST_KEY="dolphin"
+else                             BEST_KEY="phi4mini"
+fi
+
 IDX=0
 declare -a AVAILABLE_MODELS=()
 for entry in "${MODEL_LIST[@]}"; do
@@ -86,23 +97,20 @@ for entry in "${MODEL_LIST[@]}"; do
         IDX=$((IDX + 1))
         AVAILABLE_MODELS+=("$entry")
         REC=""
-        if [ "$mram" -le 6 ]  && [ "$RAM_GB" -le 8 ];  then REC="  ${CY}← recommended${RS}"; fi
-        if [ "$mram" -le 10 ] && [ "$RAM_GB" -ge 10 ] && [ "$RAM_GB" -le 18 ]; then REC="  ${CY}← recommended${RS}"; fi
-        if [ "$mram" -le 20 ] && [ "$RAM_GB" -ge 20 ] && [ "$RAM_GB" -le 36 ]; then REC="  ${CY}← recommended${RS}"; fi
-        if [ "$mram" -le 40 ] && [ "$RAM_GB" -ge 40 ]; then REC="  ${CY}← recommended${RS}"; fi
+        if [ "$mkey" = "$BEST_KEY" ]; then REC="  ${CY}← recommended${RS}"; fi
         echo -e "  ${CY}${IDX}${RS}  ${BD}${mname}${RS}  ${GR}${mdesc}${RS}${REC}"
     fi
 done
 
 echo
-echo -e "  ${GR}n  skip download${RS}"
+echo -e "  ${GR}n  skip (models download on first use)${RS}"
 echo
 printf "  Pick (1–%s, n): " "$IDX"
 read -r MODEL_CHOICE
 
 MODELS_TO_DL=()
 case "${MODEL_CHOICE,,}" in
-    n|no|skip)
+    n|no|skip|"")
         echo -e "  ${GR}Skipping — models download on first use.${RS}"
         ;;
     *)
@@ -118,19 +126,25 @@ case "${MODEL_CHOICE,,}" in
         ;;
 esac
 
+# Download with progress
 if [ "${#MODELS_TO_DL[@]}" -gt 0 ]; then
     echo
+    DL_I=0
+    DL_TOTAL="${#MODELS_TO_DL[@]}"
     for item in "${MODELS_TO_DL[@]}"; do
         IFS='|' read -r mid mname <<< "$item"
-        echo -ne "  ${GR}↓ ${mname}…${RS}"
+        DL_I=$((DL_I + 1))
+        echo -ne "  ${GR}[${DL_I}/${DL_TOTAL}] ↓ ${mname}…${RS}"
         "$VENV_DIR/bin/python" - <<PY 2>/dev/null
+import sys, time
 from mlx_lm import load
+frames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 try:
     load('${mid}')
 except Exception as e:
-    print(f"\n  warning: {e}")
+    print(f"\n  warning: {e}", file=sys.stderr)
 PY
-        echo -e "\r  ${OK} ${mname}              "
+        echo -e "\r  ${OK} [${DL_I}/${DL_TOTAL}] ${mname}              "
     done
 fi
 
@@ -155,8 +169,10 @@ else
     echo -e "  ${GR}Voice skipped.  (setup.sh --voice to add later)${RS}"
 fi
 
-# ── Copy py files ────────────────────────────────────────────────
-cp "$SCRIPT_DIR"/*.py "$LOCALAI_DIR/"
+# ── Copy py files (skip if already in place, e.g. git clone into ~/.localai) ─
+if [ "$SCRIPT_DIR" != "$LOCALAI_DIR" ]; then
+    cp "$SCRIPT_DIR"/*.py "$LOCALAI_DIR/" 2>/dev/null || true
+fi
 
 # ── Wrappers ────────────────────────────────────────────────────
 mkdir -p "$BIN_DIR"
