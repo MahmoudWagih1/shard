@@ -5,7 +5,7 @@ set -euo pipefail
 
 REPO_URL="${LOCALAI_REPO_URL:-https://github.com/magido87/shard.git}"
 LOCALAI_DIR="${HOME}/.localai"
-BRANCH="${LOCALAI_BRANCH:-main}"
+BRANCH="${LOCALAI_BRANCH:-master}"
 
 CY='\033[38;5;51m'; GR='\033[90m'; BD='\033[1m'
 YL='\033[38;5;226m'; RD='\033[38;5;196m'; RS='\033[0m'
