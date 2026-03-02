@@ -895,6 +895,7 @@ def _voice_api():
 # ── Main ─────────────────────────────────────────────────────────
 def main():
     global TEMP, CURRENT_PERSONALITY, CURRENT_THEME, UNFILTERED_MODE
+    global SHOW_STATS, PRIVACY_MODE, LOG_SESSIONS, UI_MODE
 
     # ── CLI args ─────────────────────────────────────────────────
     parser = argparse.ArgumentParser(add_help=False, prog="llm")
@@ -912,12 +913,12 @@ def main():
 
     # ── Load persistent config ────────────────────────────────────
     saved = _cfg_load()
-    TEMP               = float(saved.get("temp",        TEMP))
-    CURRENT_PERSONALITY = int(saved.get("personality", CURRENT_PERSONALITY))
-    SHOW_STATS         = str(saved.get("stats",        SHOW_STATS))
-    PRIVACY_MODE       = bool(saved.get("privacy_mode", PRIVACY_MODE))
-    LOG_SESSIONS       = bool(saved.get("log_sessions", LOG_SESSIONS))
-    UI_MODE            = str(saved.get("ui_mode",      UI_MODE))
+    TEMP                = float(saved.get("temp",         TEMP))
+    CURRENT_PERSONALITY = int(saved.get("personality",    CURRENT_PERSONALITY))
+    SHOW_STATS          = str(saved.get("stats",          SHOW_STATS))
+    PRIVACY_MODE        = bool(saved.get("privacy_mode",  PRIVACY_MODE))
+    LOG_SESSIONS        = bool(saved.get("log_sessions",  LOG_SESSIONS))
+    UI_MODE             = str(saved.get("ui_mode",        UI_MODE))
     _apply_theme(saved.get("theme", CURRENT_THEME))
     default_model = args.model or saved.get("model", "dolphin")
 

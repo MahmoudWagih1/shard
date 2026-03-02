@@ -63,18 +63,18 @@ Setup detects your Mac (M1–M5, any RAM), suggests a model that fits, and insta
 
 ## Models
 
+Setup auto-detects your RAM and recommends a model that fits. A few common options:
+
 | Key | Model | RAM needed | Notes |
 |-----|-------|-----------|-------|
-| `q14` | Qwen3.5-14B-Instruct 4bit | ~10 GB | Default for 16 GB machines |
-| `q14_3` | Qwen3.5-14B-Instruct 3bit | ~8 GB | Fits 8 GB with care |
-| `q32` | Qwen3-32B-Instruct 4bit | ~20 GB | Recommended for 32 GB |
-| `q32_3` | Qwen3-32B-Instruct 3bit | ~14 GB | Fits 16 GB |
+| `dolphin` | Dolphin 3.0 Llama 3.1 8B 4bit | ~5 GB | Fast default for 8–16 GB |
+| `q14` | Qwen3-14B 4bit | ~10 GB | Great balance for 16 GB |
+| `q32_3` | Qwen3-32B 3bit | ~14 GB | 32B quality, 16 GB friendly |
+| `q32` | Qwen3-32B 4bit | ~20 GB | Recommended for 32 GB+ |
 | `hui27` | Huihui-Qwen3.5-27B abliterated | ~16 GB | Unfiltered mode only |
-| `hui32` | Huihui-Qwen3.5-32B abliterated | ~20 GB | Unfiltered mode only |
-| `dolphin` | Dolphin 3.0 Llama 3.1 8B | ~5 GB | Fast fallback for 8 GB |
-| `qwen25` | Qwen 2.5-14B Instruct | ~9 GB | Legacy / fallback |
+| `hui35` | Huihui-Qwen3.5-35B-A3B abliterated | ~20 GB | Unfiltered MoE, via `--unfiltered` |
 
-Setup recommends the right pack for your machine automatically.
+Exact IDs live in `chat.py` and may evolve over time; setup always recommends something sane for your machine automatically.
 
 ---
 

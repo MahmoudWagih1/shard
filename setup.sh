@@ -103,17 +103,28 @@ for entry in "${MODEL_LIST[@]}"; do
 done
 
 echo
-echo -e "  ${GR}n  skip (models download on first use)${RS}"
+echo -e "  ${GR}n  skip (models download on first use when you run ${CY}llm${GR})${RS}"
 echo
-printf "  Pick (1–%s, n): " "$IDX"
+printf "  Pick (1–%s, n, Enter = recommended): " "$IDX"
 read -r MODEL_CHOICE
 
 MODELS_TO_DL=()
 case "${MODEL_CHOICE,,}" in
-    n|no|skip|"")
-        echo -e "  ${GR}Skipping — models download on first use.${RS}"
+    n|no|skip)
+        echo -e "  ${GR}Skipping — models download automatically the first time you run ${CY}llm${GR}.${RS}"
         ;;
-    *)
+    "" )
+        # Empty input → download the single recommended model (if it exists in the filtered list)
+        for entry in "${AVAILABLE_MODELS[@]}"; do
+            IFS='|' read -r mkey mid mname mdesc mram mprofile <<< "$entry"
+            if [ "$mkey" = "$BEST_KEY" ]; then
+                MODELS_TO_DL+=("$mid|$mname")
+                break
+            fi
+        done
+        ;;
+    * )
+        # Allow comma-separated list like "1,3" to pre-download multiple models
         IFS=',' read -ra NUMS <<< "$MODEL_CHOICE"
         for num in "${NUMS[@]}"; do
             num="${num// /}"
@@ -126,7 +137,7 @@ case "${MODEL_CHOICE,,}" in
         ;;
 esac
 
-# Download with visible progress (huggingface shows its own progress bar)
+# Download with visible progress (HF bars disabled for cleaner output)
 if [ "${#MODELS_TO_DL[@]}" -gt 0 ]; then
     echo
     DL_I=0
@@ -136,7 +147,7 @@ if [ "${#MODELS_TO_DL[@]}" -gt 0 ]; then
         DL_I=$((DL_I + 1))
         echo -e "  ${GR}[${DL_I}/${DL_TOTAL}] Downloading ${BD}${mname}${RS}${GR}…${RS}"
         echo
-        "$VENV_DIR/bin/python" -c "
+        HF_HUB_DISABLE_PROGRESS_BARS=1 "$VENV_DIR/bin/python" -c "
 from huggingface_hub import snapshot_download
 snapshot_download('${mid}')
 "
@@ -162,8 +173,9 @@ if [ "$INSTALL_VOICE" -eq 1 ]; then
     echo -ne "  ${GR}installing mlx-whisper…${RS}"
     "$VENV_DIR/bin/pip" install --upgrade mlx-whisper sounddevice -q
     echo -e "\r  ${OK} voice ready                "
+    echo -e "  ${GR}Start with:${RS} ${CY}llm --voice${RS}"
 else
-    echo -e "  ${GR}Voice skipped.  (run setup.sh --voice to add later)${RS}"
+    echo -e "  ${GR}Voice skipped.  (kör ${CY}setup.sh --voice${GR} senare om du vill lägga till det)${RS}"
 fi
 
 # ── Copy py files (skip if already in place, e.g. git clone into ~/.localai) ─
@@ -227,4 +239,5 @@ mv "$tmp" "$ZSHRC"
 # ── Done ─────────────────────────────────────────────────────────
 echo
 echo -e "  ${OK} ${BD}Done.${RS}  Open a new tab, type ${CY}llm${RS} and start chatting."
+echo -e "  ${GR}If ${CY}llm${GR} is not found, run:${RS} ${CY}source ~/.zshrc${RS}"
 echo

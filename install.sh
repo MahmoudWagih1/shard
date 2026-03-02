@@ -72,3 +72,5 @@ fi
 # ── Run setup ─────────────────────────────────────────────────────
 echo
 bash "$SETUP" "$@"
+echo
+echo -e "  ${OK} ${BD}localai is ready.${RS}  Open a new tab and run ${CY}llm${RS}."
