@@ -475,7 +475,7 @@ def _setup_scroll():
 
 # ── Banners ──────────────────────────────────────────────────────
 def _banner_dolphin():
-    try:    dev = mx.device_info().get("device_name", "M3")
+    try:    dev = mx.device_info().get("device_name", "M3").removeprefix("Apple ")
     except: dev = "M3"
     ram = psutil.virtual_memory().total / (1024 ** 3)
     print(f"""
@@ -494,7 +494,7 @@ def _banner_dolphin():
 
 
 def _banner_qwen():
-    try:    dev = mx.device_info().get("device_name", "M3")
+    try:    dev = mx.device_info().get("device_name", "M3").removeprefix("Apple ")
     except: dev = "M3"
     ram = psutil.virtual_memory().total / (1024 ** 3)
     print(f"""
@@ -513,7 +513,7 @@ def _banner_qwen():
 
 
 def _banner_qwen35():
-    try:    dev = mx.device_info().get("device_name", "M3")
+    try:    dev = mx.device_info().get("device_name", "M3").removeprefix("Apple ")
     except: dev = "M3"
     ram = psutil.virtual_memory().total / (1024 ** 3)
     print(f"""
