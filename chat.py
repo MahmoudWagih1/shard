@@ -1000,6 +1000,7 @@ def main():
             "log_sessions": LOG_SESSIONS,
             "privacy_mode": PRIVACY_MODE,
             "ui_mode":      UI_MODE,
+            "first_run":    False,
         })
 
     def _exit(sig=None, _frame=None):
