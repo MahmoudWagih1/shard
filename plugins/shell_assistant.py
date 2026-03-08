@@ -24,6 +24,15 @@ def on_command(cmd: str, context: dict) -> bool:
         return True
 
     print(f"\n  $ {command}")
+    print("  Confirm? y/N: ", end="", flush=True)
+    try:
+        ans = input().strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return True
+    if ans not in ("y", "yes"):
+        print("  Cancelled.\n")
+        return True
     try:
         result = subprocess.run(
             command, shell=True, capture_output=True, text=True, timeout=30,

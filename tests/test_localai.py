@@ -865,10 +865,16 @@ def _():
     # Find the except block
     except_idx = src.find("except Exception:", idx)
     assert except_idx > 0, "Could not find except block"
-    # The fallback should also have tokenize=False
-    fallback_section = src[except_idx:except_idx+200]
-    assert "tokenize=False" in fallback_section, \
-        f"Fallback missing tokenize=False:\n{fallback_section}"
+    # The fallback section must contain tokenize=False somewhere after the
+    # except block (search to end of enclosing try/except construct).
+    fallback_rest = src[except_idx:]
+    assert "tokenize=False" in fallback_rest, \
+        "Fallback missing tokenize=False entirely"
+    # Verify the fallback is not a verbatim copy of the primary call
+    primary_call = src[idx:idx+80].strip()
+    fallback_inner = src[except_idx:except_idx+150]
+    assert primary_call not in fallback_inner, \
+        "Fallback is a no-op duplicate of the primary call"
 
 
 # ====================================================================

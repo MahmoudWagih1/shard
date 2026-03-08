@@ -28,6 +28,16 @@ def on_command(cmd: str, context: dict) -> bool:
         if not command:
             print("  Usage: /shell <command>")
             return True
+        print(f"  Run: {command}")
+        print("  Confirm? y/N: ", end="", flush=True)
+        try:
+            ans = input().strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return True
+        if ans not in ("y", "yes"):
+            print("  Cancelled.\n")
+            return True
         _run_shell(command)
         return True
     return False

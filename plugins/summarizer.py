@@ -82,8 +82,11 @@ def _fetch_url(url: str) -> str | None:
             text = re.sub(r"<[^>]+>", " ", text)
             text = re.sub(r"\s+", " ", text).strip()
             return text
-        else:
+        elif any(t in content_type for t in ("text/plain", "text/markdown", "application/json", "application/xml", "text/xml", "text/csv")):
             return resp.text
+        else:
+            print(f"  Unsupported content type: {content_type or 'unknown'} — cannot summarize binary content.\n")
+            return None
     except Exception as e:
         print(f"  Fetch error: {e}")
         return None

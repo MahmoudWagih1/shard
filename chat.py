@@ -178,8 +178,9 @@ def _load_model_with_progress(model_key: str):
                 if "parameters not in model" not in str(ve):
                     raise
                 # Multimodal model — reload ignoring extra vision weights
-                from mlx_lm.utils import _download, load_model, load_tokenizer
-                model_path = _download(entry["id"])
+                from huggingface_hub import snapshot_download
+                from mlx_lm.utils import load_model, load_tokenizer
+                model_path = snapshot_download(repo_id=entry["id"])
                 model, config = load_model(model_path, lazy=False, strict=False)
                 tokenizer = load_tokenizer(model_path)
                 result["model"] = model
@@ -1297,9 +1298,32 @@ def main() -> None:
                 messages, tokenize=False, add_generation_prompt=True
             )
         except Exception:
-            prompt_str = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
+            # Fallback: merge system message into first user message and retry.
+            # Some model templates reject the "system" role; stripping it fixes that.
+            fallback_msgs = []
+            pending_sys = ""
+            for msg in messages:
+                if msg["role"] == "system":
+                    pending_sys = msg["content"]
+                elif msg["role"] == "user" and pending_sys:
+                    fallback_msgs.append({
+                        "role": "user",
+                        "content": pending_sys + "\n\n" + msg["content"],
+                    })
+                    pending_sys = ""
+                else:
+                    fallback_msgs.append(msg)
+            if not fallback_msgs:
+                fallback_msgs = messages
+            try:
+                prompt_str = tokenizer.apply_chat_template(
+                    fallback_msgs, tokenize=False, add_generation_prompt=True
+                )
+            except Exception:
+                # Last resort: plain text prompt
+                prompt_str = "\n\n".join(
+                    f"{m['role'].upper()}: {m['content']}" for m in messages
+                ) + "\n\nASSISTANT:"
 
         # Some models (Qwen 3.5 4B/2B/9B) have templates that open <think>
         # but never close it, causing endless reasoning dumps.  Force-close
